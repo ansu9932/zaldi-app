@@ -76,7 +76,7 @@ export default function Search() {
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={10}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} hitSlop={10}>
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <View style={styles.searchBox}>

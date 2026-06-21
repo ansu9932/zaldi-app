@@ -9,6 +9,9 @@ import {
   Pressable,
   FlatList,
   Animated,
+  Easing,
+  Dimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -22,10 +25,31 @@ import { useCatalog } from '../lib/useCatalog';
 import { useGuardedAdd } from '../lib/useGuardedAdd';
 import { ActiveOrderBar } from '../lib/ActiveOrderBar';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+const ADULT_W = (SCREEN_W - spacing.lg * 2 - spacing.md) / 2;
+
+interface Offer {
+  id: string;
+  code: string | null;
+  title: string;
+  subtitle: string;
+  emoji: string;
+  bg: string;
+  firstOrderOnly?: boolean;
+}
+
+const ALL_OFFERS: Offer[] = [
+  { id: 'welcome', code: null, title: 'Free Delivery', subtitle: 'On your first order', emoji: '🚀', bg: colors.ink, firstOrderOnly: true },
+  { id: 'next50', code: 'NEXT50', title: '₹50 OFF', subtitle: 'On orders above ₹199', emoji: '🎁', bg: '#1E293B' },
+  { id: 'save10', code: 'SAVE10', title: '10% OFF', subtitle: 'Up to ₹60 off', emoji: '💸', bg: '#0B3B2E' },
+  { id: 'freeship', code: 'FREESHIP', title: 'Free Delivery', subtitle: 'On orders above ₹250', emoji: '🛵', bg: '#1E293B' },
+];
+
 export default function Home() {
   const insets = useSafeAreaInsets();
   const { serviceable, distanceFromCenter, setLocation, count, name, selectedAddress } = useStore();
-  const [checking, setChecking] = useState(true);
+  const orderHistory = useStore((s) => s.orderHistory);
+  const [checking, setChecking] = useState(serviceable === null);
   const [error, setError] = useState<string | null>(null);
   const [placeName, setPlaceName] = useState<string | null>(null);
   const cartCount = count();
@@ -37,15 +61,16 @@ export default function Home() {
   const byCat = (id: string) => products.filter((p) => p.category === id);
   const fast = products.filter((p) => p.tag === 'FAST');
   const bestList = fast.length ? fast : products.slice(0, 8);
+  // First-order offer disappears once the user has placed an order.
+  const offers = ALL_OFFERS.filter((o) => !o.firstOrderOnly || orderHistory.length === 0);
 
-  async function checkLocation() {
-    setChecking(true);
+  async function checkLocation(silent = false) {
+    if (!silent) setChecking(true);
     setError(null);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setError('Location permission is needed to check delivery availability.');
-        setChecking(false);
+        if (!silent) setError('Location permission is needed to check delivery availability.');
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -67,14 +92,16 @@ export default function Home() {
         /* reverse geocoding is best-effort */
       }
     } catch (e) {
-      setError('Could not get your location. Please try again.');
+      if (!silent) setError('Could not get your location. Please try again.');
     } finally {
-      setChecking(false);
+      if (!silent) setChecking(false);
     }
   }
 
   useEffect(() => {
-    checkLocation();
+    // Block with the spinner only the first time. After we already know the
+    // area, refresh quietly in the background so returning to Home is instant.
+    checkLocation(serviceable !== null);
   }, []);
 
   if (checking) {
@@ -152,25 +179,22 @@ export default function Home() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 170 }} showsVerticalScrollIndicator={false}>
-        {/* Promo banner */}
-        <View style={styles.bannerWrap}>
-          <View style={styles.banner}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.bannerPill}>
-                <Text style={styles.bannerPillText}>WELCOME{name ? `, ${name.toUpperCase()}` : ''}</Text>
-              </View>
-              <Text style={styles.bannerTitle}>Free Delivery</Text>
-              <Text style={styles.bannerTitleGreen}>On Your First Order</Text>
-            </View>
-            <Text style={{ fontSize: 40 }}>🚀</Text>
-          </View>
-        </View>
+        {/* Offers carousel (auto-slides every 10s) */}
+        <OfferCarousel offers={offers} name={name} />
 
         {/* Categories */}
         <Text style={styles.sectionTitle}>Shop by category</Text>
         <View style={styles.catGrid}>
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.filter((c) => !c.highlight).map((c) => (
             <CategoryItem key={c.id} c={c} />
+          ))}
+        </View>
+
+        {/* Adults-only categories — big square tiles with a traveling-light border */}
+        <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>🔞 For adults (18+)</Text>
+        <View style={styles.adultRow}>
+          {CATEGORIES.filter((c) => c.highlight).map((c) => (
+            <AdultCard key={c.id} c={c} />
           ))}
         </View>
 
@@ -240,6 +264,100 @@ function CategoryItem({ c }: { c: Category }) {
         )}
       </View>
       <Text style={styles.catLabel}>{c.label}</Text>
+    </Pressable>
+  );
+}
+
+function OfferCarousel({ offers, name }: { offers: Offer[]; name: string | null }) {
+  const listRef = useRef<FlatList<Offer>>(null);
+  const [index, setIndex] = useState(0);
+  const idxRef = useRef(0);
+
+  useEffect(() => {
+    if (offers.length <= 1) return;
+    const t = setInterval(() => {
+      const next = (idxRef.current + 1) % offers.length;
+      idxRef.current = next;
+      setIndex(next);
+      listRef.current?.scrollToIndex({ index: next, animated: true });
+    }, 10000);
+    return () => clearInterval(t);
+  }, [offers.length]);
+
+  function onScrollEnd(e: any) {
+    const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    idxRef.current = i;
+    setIndex(i);
+  }
+
+  function openOffer(o: Offer) {
+    Alert.alert(
+      `${o.title} — ${o.subtitle}`,
+      o.code ? `Use code ${o.code} at checkout to get this offer.` : 'Automatically applied on your first order. Enjoy! 🎉',
+    );
+  }
+
+  return (
+    <View>
+      <FlatList
+        ref={listRef}
+        data={offers}
+        keyExtractor={(o) => o.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onScrollEnd}
+        getItemLayout={(_, i) => ({ length: SCREEN_W, offset: SCREEN_W * i, index: i })}
+        renderItem={({ item: o }) => (
+          <View style={{ width: SCREEN_W, paddingHorizontal: spacing.lg }}>
+            <Pressable style={[styles.banner, { backgroundColor: o.bg }]} onPress={() => openOffer(o)}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.bannerPill}>
+                  <Text style={styles.bannerPillText}>{o.firstOrderOnly ? `WELCOME${name ? `, ${name.toUpperCase()}` : ''}` : 'LIMITED OFFER'}</Text>
+                </View>
+                <Text style={styles.bannerTitle}>{o.title}</Text>
+                <Text style={styles.bannerTitleGreen}>{o.subtitle}</Text>
+                <View style={styles.codeChip}>
+                  <Text style={styles.codeChipText}>{o.code ? `CODE: ${o.code}` : 'AUTO-APPLIED'}</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 40 }}>{o.emoji}</Text>
+            </Pressable>
+          </View>
+        )}
+      />
+      {offers.length > 1 && (
+        <View style={styles.dots}>
+          {offers.map((o, i) => (
+            <View key={o.id} style={[styles.pageDot, i === index && styles.pageDotActive]} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function AdultCard({ c }: { c: Category }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(t, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const tx = t.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, ADULT_W, ADULT_W, 0, 0] });
+  const ty = t.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 0, ADULT_W, ADULT_W, 0] });
+
+  return (
+    <Pressable style={styles.adultOuter} onPress={() => router.push(`/category/${c.id}`)}>
+      <View style={styles.adultInner}>
+        <View style={styles.ageDot2}><Text style={styles.ageDotText}>18+</Text></View>
+        <Text style={styles.adultEmoji}>{c.emoji}</Text>
+        <Text style={styles.adultLabel}>{c.label}</Text>
+        <Text style={styles.adultSub}>Tap to explore</Text>
+      </View>
+      <Animated.View pointerEvents="none" style={[styles.travelDot, { transform: [{ translateX: tx }, { translateY: ty }] }]} />
     </Pressable>
   );
 }
@@ -348,8 +466,22 @@ const styles = StyleSheet.create({
   bannerWrap: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   banner: {
     backgroundColor: colors.ink, borderRadius: radius.xl, padding: spacing.lg,
-    flexDirection: 'row', alignItems: 'center', overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', overflow: 'hidden', minHeight: 120, marginTop: spacing.lg,
   },
+  codeChip: { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.primary, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 4 },
+  codeChipText: { color: colors.white, fontWeight: '900', fontSize: 11, letterSpacing: 0.5 },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  pageDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  pageDotActive: { width: 18, backgroundColor: colors.primary },
+
+  adultRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  adultOuter: { width: ADULT_W, height: ADULT_W, position: 'relative' },
+  adultInner: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', padding: spacing.md, overflow: 'hidden' },
+  travelDot: { position: 'absolute', top: 0, left: 0, width: 12, height: 12, borderRadius: 6, marginLeft: -6, marginTop: -6, backgroundColor: colors.primary, shadowColor: colors.primary, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  ageDot2: { position: 'absolute', top: 8, right: 8, backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 2 },
+  adultEmoji: { fontSize: 40, marginBottom: 8 },
+  adultLabel: { fontWeight: '900', color: colors.ink, fontSize: 16 },
+  adultSub: { color: colors.primaryDark, fontWeight: '700', fontSize: 11, marginTop: 2 },
   bannerPill: { backgroundColor: 'rgba(255,255,255,0.15)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginBottom: 8 },
   bannerPillText: { color: colors.white, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   bannerTitle: { color: colors.white, fontSize: 22, fontWeight: '900', lineHeight: 26 },

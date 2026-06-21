@@ -65,7 +65,8 @@ export default function AddressScreen() {
       lat: pin.lat,
       lng: pin.lng,
     });
-    router.back();
+    if (router.canGoBack()) router.back();
+    else router.replace('/home');
   }
 
   return (
@@ -85,7 +86,8 @@ export default function AddressScreen() {
                 style={styles.savedCard}
                 onPress={() => {
                   selectAddress(a.id);
-                  router.back();
+                  if (router.canGoBack()) router.back();
+                  else router.replace('/home');
                 }}
               >
                 <Text style={styles.savedLabel}>

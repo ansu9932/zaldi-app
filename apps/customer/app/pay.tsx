@@ -39,7 +39,7 @@ export default function Pay() {
         router.replace('/track');
       } else if (msg.status === 'dismiss' || msg.status === 'error') {
         Alert.alert('Payment cancelled', 'Your order was not paid. You can try again.', [
-          { text: 'OK', onPress: () => router.back() },
+          { text: 'OK', onPress: () => (router.canGoBack() ? router.back() : router.replace('/home')) },
         ]);
       }
     } catch {}
@@ -52,7 +52,7 @@ export default function Pay() {
         <Text style={{ fontSize: 40 }}>⚠️</Text>
         <Text style={styles.errTitle}>Payment unavailable</Text>
         <Text style={styles.errText}>{error}</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.btn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}>
           <Text style={styles.btnText}>Go back</Text>
         </TouchableOpacity>
       </View>

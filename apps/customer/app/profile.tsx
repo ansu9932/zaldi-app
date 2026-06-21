@@ -47,12 +47,6 @@ export default function Profile() {
             <Text style={styles.statValue}>{addresses.length}</Text>
             <Text style={styles.statLabel}>Addresses</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              ₹{orderHistory.reduce((s, o) => s + o.total, 0)}
-            </Text>
-            <Text style={styles.statLabel}>Spent</Text>
-          </View>
         </View>
 
         {/* Manage addresses */}
