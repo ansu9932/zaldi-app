@@ -1,11 +1,12 @@
 import { useLocalSearchParams, router } from 'expo-router';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../../lib/brand';
-import { productsByCategory, CATEGORIES, Product } from '../../lib/catalog';
+import { CATEGORIES, Product } from '../../lib/catalog';
 import { useStore } from '../../lib/store';
 import { ProductImage } from '../../lib/ProductImage';
 import { useCatalog } from '../../lib/useCatalog';
+import { useGuardedAdd } from '../../lib/useGuardedAdd';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
@@ -14,7 +15,8 @@ const CARD_W = (width - spacing.lg * 2 - GAP) / 2;
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { lines, add, remove, count } = useStore();
+  const { lines, remove, count, toggleFavorite, isFavorite } = useStore();
+  const guardedAdd = useGuardedAdd();
   const { products: allProducts } = useCatalog();
   const products = allProducts.filter((p) => p.category === (id ?? ''));
   const cat = CATEGORIES.find((c) => c.id === id);
@@ -27,6 +29,7 @@ export default function CategoryScreen() {
 
   function ProductCard({ item }: { item: Product }) {
     const qty = lines[item.id]?.qty ?? 0;
+    const fav = isFavorite(item.id);
     return (
       <View style={[styles.card, { width: CARD_W }]}>
         {item.tag && (
@@ -34,16 +37,21 @@ export default function CategoryScreen() {
             <Text style={styles.tagText}>{item.tag}</Text>
           </View>
         )}
-        <ProductImage product={item} size={CARD_W - 24} style={{ marginBottom: 10 }} />
-        <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.unit}>{item.unit}</Text>
+        <TouchableOpacity style={styles.favBtn} onPress={() => toggleFavorite(item.id)} hitSlop={8}>
+          <Text style={{ fontSize: 16 }}>{fav ? '❤️' : '🤍'}</Text>
+        </TouchableOpacity>
+        <Pressable onPress={() => router.push(`/product/${item.id}`)}>
+          <ProductImage product={item} size={CARD_W - 24} style={{ marginBottom: 10 }} />
+          <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.unit}>{item.unit}</Text>
+        </Pressable>
         <View style={styles.bottom}>
           <View>
             <Text style={styles.price}>₹{item.price}</Text>
             {item.mrp && <Text style={styles.mrp}>₹{item.mrp}</Text>}
           </View>
           {qty === 0 ? (
-            <TouchableOpacity style={styles.addBtn} onPress={() => add(item)}>
+            <TouchableOpacity style={styles.addBtn} onPress={() => guardedAdd(item)}>
               <Text style={styles.addBtnText}>ADD</Text>
             </TouchableOpacity>
           ) : (
@@ -52,7 +60,7 @@ export default function CategoryScreen() {
                 <Text style={styles.qtySign}>−</Text>
               </TouchableOpacity>
               <Text style={styles.qtyNum}>{qty}</Text>
-              <TouchableOpacity onPress={() => add(item)} style={styles.qtyBtn}>
+              <TouchableOpacity onPress={() => guardedAdd(item)} style={styles.qtyBtn}>
                 <Text style={styles.qtySign}>+</Text>
               </TouchableOpacity>
             </View>
@@ -110,6 +118,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   tag: { position: 'absolute', top: 8, left: 8, zIndex: 2, backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
   tagText: { color: colors.primaryDark, fontSize: 9, fontWeight: '900' },
+  favBtn: { position: 'absolute', top: 6, right: 6, zIndex: 2, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   name: { fontWeight: '700', color: colors.ink, fontSize: 13, minHeight: 34 },
   unit: { color: colors.inkFaint, fontSize: 11, marginTop: 2, marginBottom: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

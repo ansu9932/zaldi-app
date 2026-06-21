@@ -25,6 +25,9 @@ export default function RootLayout() {
         <Stack.Screen name="track" options={{ title: 'Track order' }} />
         <Stack.Screen name="pay" options={{ title: 'Payment' }} />
         <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="product/[id]" options={{ title: 'Product' }} />
+        <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="favorites" options={{ title: 'My Favorites' }} />
         <Stack.Screen name="cart" options={{ title: 'Your Cart' }} />
       </Stack>
     </SafeAreaProvider>

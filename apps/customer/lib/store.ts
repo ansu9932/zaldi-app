@@ -32,9 +32,12 @@ export interface LastOrder {
   paymentMethod: 'upi' | 'cod';
   address: Address;
   shop: LatLng;
+  discount?: number;
+  tip?: number;
+  couponCode?: string | null;
 }
 
-export interface OrderItemLite { name: string; qty: number; price: number }
+export interface OrderItemLite { name: string; qty: number; price: number; productId?: string }
 
 export interface PastOrder {
   id: string;
@@ -45,6 +48,11 @@ export interface PastOrder {
   addressLabel: string;
   status: string;
   items: OrderItemLite[];
+  discount?: number;
+  tip?: number;
+  rated?: boolean;
+  // Full snapshot of cart lines so the customer can re-order in one tap.
+  reorder?: CartLine[];
 }
 
 interface AppState {
@@ -72,6 +80,12 @@ interface AppState {
   clear: () => void;
   count: () => number;
   subtotal: () => number;
+  cartShopId: () => string | null;
+  setCart: (lines: CartLine[]) => void;
+
+  favorites: string[];
+  toggleFavorite: (productId: string) => void;
+  isFavorite: (productId: string) => boolean;
 
   lastOrder: LastOrder | null;
   setLastOrder: (o: LastOrder) => void;
@@ -81,6 +95,7 @@ interface AppState {
 
   orderHistory: PastOrder[];
   addToHistory: (o: PastOrder) => void;
+  markRated: (id: string) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -130,6 +145,24 @@ export const useStore = create<AppState>()(
       clear: () => set({ lines: {} }),
       count: () => Object.values(get().lines).reduce((s, l) => s + l.qty, 0),
       subtotal: () => Object.values(get().lines).reduce((s, l) => s + l.product.price * l.qty, 0),
+      cartShopId: () => {
+        const first = Object.values(get().lines)[0];
+        return first ? first.product.shopId : null;
+      },
+      setCart: (lines) => {
+        const map: Record<string, CartLine> = {};
+        for (const l of lines) map[l.product.id] = { product: l.product, qty: l.qty };
+        set({ lines: map });
+      },
+
+      favorites: [],
+      toggleFavorite: (productId) =>
+        set((s) => ({
+          favorites: s.favorites.includes(productId)
+            ? s.favorites.filter((id) => id !== productId)
+            : [...s.favorites, productId],
+        })),
+      isFavorite: (productId) => get().favorites.includes(productId),
 
       lastOrder: null,
       setLastOrder: (o) => set({ lastOrder: o, lastOrderStatus: 'placed' }),
@@ -139,6 +172,7 @@ export const useStore = create<AppState>()(
 
       orderHistory: [],
       addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
+      markRated: (id) => set((s) => ({ orderHistory: s.orderHistory.map((o) => (o.id === id ? { ...o, rated: true } : o)) })),
     }),
     {
       name: 'next-customer-store',
@@ -153,6 +187,7 @@ export const useStore = create<AppState>()(
         orderHistory: s.orderHistory,
         lastOrder: s.lastOrder,
         lastOrderStatus: s.lastOrderStatus,
+        favorites: s.favorites,
       }),
     },
   ),

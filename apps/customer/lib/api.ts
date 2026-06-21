@@ -20,6 +20,9 @@ export interface CreateOrderParams {
   total: number;
   eta: number;
   paymentMethod: 'upi' | 'cod';
+  discount?: number;
+  tip?: number;
+  couponCode?: string | null;
 }
 
 export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; id: string; error?: string }> {
@@ -43,6 +46,9 @@ export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; 
         delivery_fee: p.deliveryFee,
         rain_fee: p.rainFee,
         surge_fee: p.surgeFee,
+        discount: p.discount ?? 0,
+        tip_amount: p.tip ?? 0,
+        coupon_code: p.couponCode ?? null,
         total: p.total,
         payment_method: p.paymentMethod,
         payment_status: p.paymentMethod === 'cod' ? 'cod' : 'pending',
@@ -143,12 +149,59 @@ export async function markOrderPaid(orderId: string, paymentId: string): Promise
     .eq('id', orderId);
 }
 
+/**
+ * Customer-initiated cancellation. Only allowed before the store accepts the order
+ * (status still 'placed' or 'pending_payment'); the conditional update enforces this.
+ */
+export async function cancelOrder(orderId: string): Promise<{ ok: boolean }> {
+  if (DEMO_MODE) return { ok: true };
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+    .in('status', ['placed', 'pending_payment'])
+    .select('id');
+  return { ok: !error && !!data && data.length > 0 };
+}
 
-import { Product } from './catalog';
+export interface RiderInfo { name: string; phone: string | null }
 
-/** Load the product catalog from the database (managed in Admin). Empty until products are added. */
+/** Fetch the real assigned rider's name + phone for an order (null until assigned). */
+export async function getOrderRider(orderId: string): Promise<RiderInfo | null> {
+  if (DEMO_MODE) return null;
+  const { data: order } = await supabase.from('orders').select('rider_id').eq('id', orderId).single();
+  if (!order?.rider_id) return null;
+  // Prefer the safe public view (works after secure_setup.sql); fall back to staff.
+  const pub = await supabase.from('staff_public').select('name, phone').eq('id', order.rider_id).maybeSingle();
+  if (!pub.error && pub.data) return { name: pub.data.name, phone: pub.data.phone ?? null };
+  const { data: rider } = await supabase.from('staff').select('name, phone').eq('id', order.rider_id).maybeSingle();
+  if (!rider) return null;
+  return { name: rider.name, phone: rider.phone ?? null };
+}
+
+/** Save a customer rating (1-5) + optional comment for a delivered order. */
+export async function rateOrder(orderId: string, rating: number, comment?: string): Promise<{ ok: boolean }> {
+  if (DEMO_MODE) return { ok: true };
+  const { error } = await supabase.from('ratings').insert({ order_id: orderId, rating, comment: comment ?? null });
+  return { ok: !error };
+}
+
+
+import { Product, PRODUCTS, shopById } from './catalog';
+
+/**
+ * Load the product catalog.
+ * - DEMO_MODE: returns the bundled sample Contai catalog (so the app is fully usable offline).
+ * - LIVE: returns in-stock products from the database (managed in Admin).
+ */
 export async function getCatalogProducts(): Promise<Product[]> {
-  if (DEMO_MODE) return [];
+  if (DEMO_MODE) {
+    // Enrich demo products with their shop coordinates so distance/ETA work.
+    return PRODUCTS.map((p) => {
+      const shop = shopById(p.shopId);
+      return { ...p, shopLat: shop?.location.lat, shopLng: shop?.location.lng };
+    });
+  }
   try {
     const { data, error } = await supabase
       .from('products')

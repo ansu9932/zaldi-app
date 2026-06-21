@@ -52,7 +52,10 @@ export default function App() {
   const orderRows = live;
   const liveCount = orderRows.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length;
   const delivered = orderRows.filter((o) => o.status === 'delivered');
-  const todayRevenue = orderRows.reduce((s, o) => s + o.total, 0);
+  // Revenue excludes cancelled and unpaid (pending_payment) orders.
+  const todayRevenue = orderRows
+    .filter((o) => o.status !== 'cancelled' && o.status !== 'pending_payment')
+    .reduce((s, o) => s + o.total, 0);
   const riders = staff.filter((s) => s.role === 'rider');
   const commission = Math.round(delivered.reduce((s, o) => s + o.total * 0.1, 0));
 
@@ -344,6 +347,7 @@ function StaffManager() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [shop, setShop] = useState('');
 
   useEffect(() => { if (shops.length && !shop) setShop(shops[0].id); }, [shops]);
@@ -354,8 +358,8 @@ function StaffManager() {
   async function onAdd() {
     if (!name || !username || !password) { setMsg('Name, username and password are required.'); return; }
     if (role === 'merchant' && !shop) { setMsg('Assign a shop to the merchant (add one in Shops first).'); return; }
-    const res = await addStaff({ role, name, username, password, shop_id: role === 'merchant' ? shop : null, active: true });
-    if (res.ok) { setMsg('Login created ✅'); setName(''); setUsername(''); setPassword(''); load(); }
+    const res = await addStaff({ role, name, username, password, phone: phone || null, shop_id: role === 'merchant' ? shop : null, active: true });
+    if (res.ok) { setMsg('Login created ✅'); setName(''); setUsername(''); setPassword(''); setPhone(''); load(); }
     else setMsg('Error: ' + res.error);
   }
 
@@ -380,6 +384,7 @@ function StaffManager() {
           <input className="inp" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
           <input className="inp" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input className="inp" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input className="inp" placeholder="Phone (for customer to call rider)" value={phone} onChange={(e) => setPhone(e.target.value)} />
           {role === 'merchant' && (
             <select className="inp" value={shop} onChange={(e) => setShop(e.target.value)}>
               {shops.length === 0 && <option value="">— add a shop first —</option>}

@@ -122,3 +122,33 @@ export function subscribeOrders(onChange: () => void): () => void {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+/** Today's delivered count + earnings for this rider (so stats survive app reloads). */
+export async function fetchTodayStats(riderId?: string): Promise<{ deliveries: number; earnings: number }> {
+  if (DEMO_MODE || !riderId) return { deliveries: 0, earnings: 0 };
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('distance_km')
+      .eq('rider_id', riderId)
+      .eq('status', 'delivered')
+      .gte('updated_at', start.toISOString());
+    if (error || !data) return { deliveries: 0, earnings: 0 };
+    const earnings = data.reduce((s: number, r: any) => s + payout(Number(r.distance_km ?? 2)), 0);
+    return { deliveries: data.length, earnings };
+  } catch {
+    return { deliveries: 0, earnings: 0 };
+  }
+}
+
+/** Persist the rider's online/offline status (best-effort; needs staff.is_online column). */
+export async function setRiderOnline(riderId: string | undefined, online: boolean): Promise<void> {
+  if (DEMO_MODE || !riderId) return;
+  try {
+    await supabase.from('staff').update({ is_online: online }).eq('id', riderId);
+  } catch {
+    /* column may not exist yet — ignore */
+  }
+}

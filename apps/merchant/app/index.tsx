@@ -3,7 +3,7 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, RefreshCo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Order, fetchActiveOrders, setStatus, subscribeOrders } from '../lib/api';
+import { Order, fetchActiveOrders, setStatus, subscribeOrders, setMerchantOnline } from '../lib/api';
 import { useAuth, Session } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
 
@@ -64,7 +64,7 @@ function Dashboard({ session }: { session: Session }) {
             <Text style={[styles.onlineText, { color: online ? colors.primary : colors.inkFaint }]}>
               {online ? 'Online' : 'Offline'}
             </Text>
-            <Switch value={online} onValueChange={setOnline} trackColor={{ true: colors.primary, false: colors.inkFaint }} thumbColor={colors.white} />
+            <Switch value={online} onValueChange={(v) => { setOnline(v); setMerchantOnline(session.id, v); }} trackColor={{ true: colors.primary, false: colors.inkFaint }} thumbColor={colors.white} />
             <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
               <Text style={styles.logoutText}>Log out</Text>
             </TouchableOpacity>

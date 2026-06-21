@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   ActivityIndicator,
   Pressable,
   FlatList,
@@ -14,11 +13,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
-import { isServiceable, SERVICE_RADIUS_KM } from '../lib/algorithms';
+import { isServiceable, SERVICE_RADIUS_KM, SERVICE_CENTER } from '../lib/algorithms';
 import { CATEGORIES, Product } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { ProductImage } from '../lib/ProductImage';
 import { useCatalog } from '../lib/useCatalog';
+import { useGuardedAdd } from '../lib/useGuardedAdd';
 import { ActiveOrderBar } from '../lib/ActiveOrderBar';
 
 export default function Home() {
@@ -96,6 +96,13 @@ export default function Home() {
         <TouchableOpacity style={styles.retryBtn} onPress={checkLocation}>
           <Text style={styles.retryText}>Allow location</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.manualBtn}
+          onPress={() => setLocation(SERVICE_CENTER, true, 0)}
+        >
+          <Text style={styles.manualText}>I'm in Contai — continue manually</Text>
+        </TouchableOpacity>
+        <Text style={styles.manualHint}>We'll confirm your exact delivery address at checkout.</Text>
       </View>
     );
   }
@@ -122,14 +129,10 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.search}>
+        <Pressable style={styles.search} onPress={() => router.push('/search')}>
           <Text style={{ fontSize: 16, color: colors.inkFaint }}>🔍</Text>
-          <TextInput
-            placeholder="What do you need next?"
-            placeholderTextColor={colors.inkFaint}
-            style={styles.searchInput}
-          />
-        </View>
+          <Text style={styles.searchPlaceholder}>What do you need next?</Text>
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 170 }} showsVerticalScrollIndicator={false}>
@@ -212,7 +215,8 @@ export default function Home() {
 }
 
 function ProductRow({ title, data, onSeeAll }: { title: string; data: Product[]; onSeeAll?: () => void }) {
-  const { lines, add, remove } = useStore();
+  const { lines, remove, toggleFavorite, isFavorite } = useStore();
+  const guardedAdd = useGuardedAdd();
   return (
     <View style={{ marginTop: spacing.xl }}>
       <View style={styles.rowHead}>
@@ -231,6 +235,7 @@ function ProductRow({ title, data, onSeeAll }: { title: string; data: Product[];
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}
         renderItem={({ item }) => {
           const qty = lines[item.id]?.qty ?? 0;
+          const fav = isFavorite(item.id);
           return (
             <View style={styles.pCard}>
               {item.tag && (
@@ -238,16 +243,21 @@ function ProductRow({ title, data, onSeeAll }: { title: string; data: Product[];
                   <Text style={styles.pTagText}>{item.tag}</Text>
                 </View>
               )}
-              <ProductImage product={item} size={90} style={{ marginBottom: 10 }} />
-              <Text style={styles.pName} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.pUnit}>{item.unit}</Text>
+              <TouchableOpacity style={styles.favBtn} onPress={() => toggleFavorite(item.id)} hitSlop={8}>
+                <Text style={{ fontSize: 16 }}>{fav ? '❤️' : '🤍'}</Text>
+              </TouchableOpacity>
+              <Pressable onPress={() => router.push(`/product/${item.id}`)}>
+                <ProductImage product={item} size={90} style={{ marginBottom: 10 }} />
+                <Text style={styles.pName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.pUnit}>{item.unit}</Text>
+              </Pressable>
               <View style={styles.pBottom}>
                 <View>
                   <Text style={styles.pPrice}>₹{item.price}</Text>
                   {item.mrp && <Text style={styles.pMrp}>₹{item.mrp}</Text>}
                 </View>
                 {qty === 0 ? (
-                  <TouchableOpacity style={styles.addBtn} onPress={() => add(item)}>
+                  <TouchableOpacity style={styles.addBtn} onPress={() => guardedAdd(item)}>
                     <Text style={styles.addBtnText}>ADD</Text>
                   </TouchableOpacity>
                 ) : (
@@ -256,7 +266,7 @@ function ProductRow({ title, data, onSeeAll }: { title: string; data: Product[];
                       <Text style={styles.qtySign}>−</Text>
                     </TouchableOpacity>
                     <Text style={styles.qtyNum}>{qty}</Text>
-                    <TouchableOpacity onPress={() => add(item)} style={styles.qtyBtn}>
+                    <TouchableOpacity onPress={() => guardedAdd(item)} style={styles.qtyBtn}>
                       <Text style={styles.qtySign}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -279,6 +289,9 @@ const styles = StyleSheet.create({
   unavailableTitle: { fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   retryBtn: { marginTop: 20, backgroundColor: colors.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: radius.pill },
   retryText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  manualBtn: { marginTop: 14, paddingHorizontal: 24, paddingVertical: 12, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.primary },
+  manualText: { color: colors.primaryDark, fontWeight: '800', fontSize: 14 },
+  manualHint: { color: colors.inkFaint, fontSize: 12, marginTop: 10, textAlign: 'center' },
 
   header: {
     backgroundColor: colors.white, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg,
@@ -300,6 +313,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   searchInput: { flex: 1, fontSize: 15, color: colors.ink },
+  searchPlaceholder: { flex: 1, fontSize: 15, color: colors.inkFaint },
 
   bannerWrap: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   banner: {
@@ -332,6 +346,7 @@ const styles = StyleSheet.create({
   pCard: { width: 150, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   pTag: { position: 'absolute', top: 8, left: 8, zIndex: 2, backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
   pTagText: { color: colors.primaryDark, fontSize: 9, fontWeight: '900' },
+  favBtn: { position: 'absolute', top: 6, right: 6, zIndex: 2, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   pImg: { height: 90, backgroundColor: colors.bgSoft, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   pName: { fontWeight: '700', color: colors.ink, fontSize: 13 },
   pUnit: { color: colors.inkFaint, fontSize: 11, marginTop: 2, marginBottom: 10 },

@@ -60,3 +60,13 @@ export function subscribeOrders(onChange: () => void): () => void {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+/** Persist the merchant's online/offline status (best-effort; needs staff.is_online column). */
+export async function setMerchantOnline(staffId: string | undefined, online: boolean): Promise<void> {
+  if (DEMO_MODE || !staffId) return;
+  try {
+    await supabase.from('staff').update({ is_online: online }).eq('id', staffId);
+  } catch {
+    /* column may not exist yet — ignore */
+  }
+}
