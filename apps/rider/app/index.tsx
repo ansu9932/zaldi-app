@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import QRCode from 'react-native-qrcode-svg';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
 import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder } from '../lib/api';
@@ -172,7 +171,10 @@ function Dashboard() {
             <Text style={styles.modalSub}>Ask the customer to scan with any UPI app</Text>
             <View style={styles.qrBox}>
               {UPI_VPA ? (
-                <QRCode value={upiUrl} size={200} />
+                <Image
+                  source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(upiUrl) }}
+                  style={{ width: 220, height: 220 }}
+                />
               ) : (
                 <Text style={styles.qrWarn}>Set EXPO_PUBLIC_UPI_VPA in the rider .env to your UPI ID to enable QR.</Text>
               )}
