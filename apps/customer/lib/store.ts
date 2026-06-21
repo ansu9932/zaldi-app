@@ -75,6 +75,7 @@ interface AppState {
 
   lastOrder: LastOrder | null;
   setLastOrder: (o: LastOrder) => void;
+  clearLastOrder: () => void;
   lastOrderStatus: string | null;
   setLastOrderStatus: (s: string) => void;
 
@@ -132,6 +133,7 @@ export const useStore = create<AppState>()(
 
       lastOrder: null,
       setLastOrder: (o) => set({ lastOrder: o, lastOrderStatus: 'placed' }),
+      clearLastOrder: () => set({ lastOrder: null, lastOrderStatus: null }),
       lastOrderStatus: null,
       setLastOrderStatus: (st) => set({ lastOrderStatus: st }),
 

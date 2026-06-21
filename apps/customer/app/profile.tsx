@@ -69,7 +69,7 @@ export default function Profile() {
             <Text style={styles.emptyText}>No orders yet. Your past orders will appear here.</Text>
           </View>
         ) : (
-          orderHistory.map((o) => (
+          orderHistory.slice(0, 5).map((o) => (
             <View key={o.id} style={styles.orderCard}>
               <View style={styles.orderTop}>
                 <Text style={styles.orderId}>#{String(o.id).replace(/-/g, '').slice(0, 6).toUpperCase()}</Text>
@@ -95,6 +95,12 @@ export default function Profile() {
               </View>
             </View>
           ))
+        )}
+
+        {orderHistory.length > 5 && (
+          <TouchableOpacity style={styles.seeAllBtn} onPress={() => router.push('/orders')}>
+            <Text style={styles.seeAllText}>See all {orderHistory.length} orders →</Text>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
@@ -138,7 +144,8 @@ const styles = StyleSheet.create({
   orderTime: { color: colors.inkFaint, fontSize: 12 },
   orderTotal: { fontWeight: '900', color: colors.ink, fontSize: 16 },
 
-  logoutBtn: { marginHorizontal: spacing.lg, marginTop: spacing.xl, borderWidth: 1.5, borderColor: colors.error, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },
-  logoutText: { color: colors.error, fontWeight: '800', fontSize: 15 },
+  logoutBtn: { marginHorizontal: spacing.lg, marginTop: spacing.xl, borderWidth: 1.5, borderColor: colors.error, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },  logoutText: { color: colors.error, fontWeight: '800', fontSize: 15 },
+  seeAllBtn: { marginHorizontal: spacing.lg, marginTop: spacing.sm, backgroundColor: colors.primaryLight, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center' },
+  seeAllText: { color: colors.primaryDark, fontWeight: '800', fontSize: 14 },
   version: { textAlign: 'center', color: colors.inkFaint, fontSize: 12, marginTop: spacing.lg },
 });

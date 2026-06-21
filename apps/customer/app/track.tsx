@@ -16,6 +16,7 @@ import { useStore } from '../lib/store';
 import { DEMO_MODE } from '../lib/supabase';
 import { getOrder, subscribeOrder, OrderStatusRow } from '../lib/api';
 import { distanceKm } from '../lib/algorithms';
+import { LiveMap } from '../lib/LiveMap';
 
 const STEPS = [
   { key: 'confirmed', label: 'Order confirmed', icon: '✅' },
@@ -49,8 +50,11 @@ export default function Track() {
   const insets = useSafeAreaInsets();
   const { lastOrder } = useStore();
   const setLastOrderStatus = useStore((s) => s.setLastOrderStatus);
+  const clearLastOrder = useStore((s) => s.clearLastOrder);
   const [step, setStep] = useState(0);
   const [riderDist, setRiderDist] = useState<number | null>(null);
+  const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [cancelled, setCancelled] = useState(false);
   const t = useRef(new Animated.Value(0)).current;
   const animatedOnce = useRef(false);
 
@@ -69,8 +73,10 @@ export default function Track() {
       if (!mounted) return;
       setStep(statusToStep(row.status));
       setLastOrderStatus(row.status);
+      if (row.status === 'cancelled') setCancelled(true);
       if (row.rider_lat != null && row.rider_lng != null && lastOrder) {
         const rider = { lat: row.rider_lat, lng: row.rider_lng };
+        setRiderPos(rider);
         const home = { lat: lastOrder.address.lat, lng: lastOrder.address.lng };
         const dRemain = distanceKm(rider, home);
         setRiderDist(dRemain);
@@ -99,9 +105,18 @@ export default function Track() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
-      <Stack.Screen options={{ title: 'Track order', headerShown: !delivered }} />
+      <Stack.Screen options={{ title: 'Track order', headerShown: !delivered && !cancelled }} />
 
-      {delivered ? (
+      {cancelled ? (
+        <View style={[styles.doneWrap, { paddingTop: insets.top + 40 }]}>
+          <View style={[styles.doneCircle, { backgroundColor: '#FEE2E2' }]}><Text style={{ fontSize: 56 }}>❌</Text></View>
+          <Text style={styles.doneTitle}>Order cancelled</Text>
+          <Text style={styles.doneSub}>Sorry, the store could not accept this order. Any online payment will be refunded.</Text>
+          <TouchableOpacity style={styles.homeBtn} onPress={() => { clearLastOrder(); router.replace('/home'); }}>
+            <Text style={styles.homeBtnText}>Back to home</Text>
+          </TouchableOpacity>
+        </View>
+      ) : delivered ? (
         <View style={[styles.doneWrap, { paddingTop: insets.top + 40 }]}>
           <View style={styles.doneCircle}><Text style={{ fontSize: 60 }}>🎉</Text></View>
           <Text style={styles.doneTitle}>Order delivered!</Text>
@@ -122,20 +137,15 @@ export default function Track() {
             <Text style={styles.etaStatus}>{STEPS[step].icon} {STEPS[step].label}</Text>
           </View>
 
-          <View style={styles.map}>
-            {[0.25, 0.5, 0.75].map((p) => <View key={'h' + p} style={[styles.gridH, { top: PANEL_H * p }]} />)}
-            {[0.25, 0.5, 0.75].map((p) => <View key={'v' + p} style={[styles.gridV, { left: PANEL_W * p }]} />)}
-            {Array.from({ length: 16 }).map((_, i) => {
-              const f = i / 15;
-              return <View key={i} style={[styles.routeDot, { left: SHOP.x + (HOME.x - SHOP.x) * f + 14, top: SHOP.y + (HOME.y - SHOP.y) * f + 14 }]} />;
-            })}
-            <View style={[styles.pin, { left: SHOP.x, top: SHOP.y }]}><Text style={styles.pinEmoji}>🏪</Text></View>
-            <View style={[styles.pin, { left: HOME.x, top: HOME.y }]}><Text style={styles.pinEmoji}>🏠</Text></View>
-            <Animated.View style={[styles.rider, { transform: [{ translateX: riderLeft }, { translateY: riderTop }] }]}>
-              <Text style={{ fontSize: 22 }}>🛵</Text>
-            </Animated.View>
-            <View style={styles.mapBadge}><Text style={styles.mapBadgeText}>Live tracking</Text></View>
-          </View>
+          {lastOrder ? (
+            <View style={{ marginBottom: spacing.lg }}>
+              <LiveMap
+                shop={lastOrder.shop}
+                home={{ lat: lastOrder.address.lat, lng: lastOrder.address.lng }}
+                rider={riderPos}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.riderCard}>
             <View style={styles.avatar}><Text style={{ fontSize: 26 }}>🧑‍✈️</Text></View>

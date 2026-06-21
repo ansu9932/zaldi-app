@@ -23,6 +23,7 @@ export function ActiveOrderBar() {
   const lastOrder = useStore((s) => s.lastOrder);
   const status = useStore((s) => s.lastOrderStatus) ?? 'placed';
   const setStatus = useStore((s) => s.setLastOrderStatus);
+  const clearLastOrder = useStore((s) => s.clearLastOrder);
   const pulse = useState(new Animated.Value(1))[0];
 
   useEffect(() => {
@@ -46,18 +47,31 @@ export function ActiveOrderBar() {
   }, [lastOrder?.id]);
 
   if (!lastOrder) return null;
-  if (status === 'delivered' || status === 'cancelled') return null;
+  if (status === 'delivered') return null;
 
+  const cancelled = status === 'cancelled';
   const code = String(lastOrder.id).replace(/-/g, '').slice(0, 6).toUpperCase();
 
   return (
-    <TouchableOpacity style={styles.bar} onPress={() => router.push('/track')} activeOpacity={0.9}>
-      <Animated.View style={[styles.dot, { opacity: pulse }]} />
+    <TouchableOpacity
+      style={[styles.bar, cancelled && styles.barCancel]}
+      onPress={() => (cancelled ? clearLastOrder() : router.push('/track'))}
+      activeOpacity={0.9}
+    >
+      {cancelled ? (
+        <Text style={{ fontSize: 18 }}>❌</Text>
+      ) : (
+        <Animated.View style={[styles.dot, { opacity: pulse }]} />
+      )}
       <View style={{ flex: 1 }}>
-        <Text style={styles.title}>Order #{code} · ₹{lastOrder.total}</Text>
-        <Text style={styles.status}>{LABEL[status] ?? 'Order in progress'}</Text>
+        <Text style={styles.title}>
+          {cancelled ? `Order #${code} was cancelled by the store` : `Order #${code} · ₹${lastOrder.total}`}
+        </Text>
+        <Text style={[styles.status, cancelled && { color: '#FECACA' }]}>
+          {cancelled ? 'Tap to dismiss' : LABEL[status] ?? 'Order in progress'}
+        </Text>
       </View>
-      <Text style={styles.cta}>Track ›</Text>
+      <Text style={styles.cta}>{cancelled ? '✕' : 'Track ›'}</Text>
     </TouchableOpacity>
   );
 }
@@ -74,6 +88,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.lg,
   },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+  barCancel: { backgroundColor: colors.error },
   title: { color: colors.white, fontWeight: '800', fontSize: 14 },
   status: { color: colors.primary, fontWeight: '700', fontSize: 12, marginTop: 2 },
   cta: { color: colors.white, fontWeight: '900', fontSize: 14 },

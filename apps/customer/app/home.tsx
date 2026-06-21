@@ -30,7 +30,7 @@ export default function Home() {
   const addr = selectedAddress();
   const lastOrder = useStore((s) => s.lastOrder);
   const lastOrderStatus = useStore((s) => s.lastOrderStatus);
-  const showActive = !!lastOrder && lastOrderStatus !== 'delivered' && lastOrderStatus !== 'cancelled';
+  const showActive = !!lastOrder && lastOrderStatus !== 'delivered';
   const { products } = useCatalog();
   const byCat = (id: string) => products.filter((p) => p.category === id);
   const fast = products.filter((p) => p.tag === 'FAST');
@@ -172,7 +172,7 @@ export default function Home() {
       </ScrollView>
 
       {(cartCount > 0 || showActive) && (
-        <View style={[styles.bottomStack, { paddingBottom: insets.bottom, backgroundColor: showActive ? colors.ink : colors.primary }]}>
+        <View style={[styles.bottomStack, { paddingBottom: insets.bottom, backgroundColor: lastOrderStatus === 'cancelled' ? colors.error : showActive ? colors.ink : colors.primary }]}>
           {cartCount > 0 && (
             <TouchableOpacity style={styles.cartBar} onPress={() => router.push('/cart')}>
               <Text style={styles.cartBarText}>

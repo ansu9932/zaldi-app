@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -8,14 +8,23 @@ import { shopById } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { createOrder } from '../lib/api';
 import { DEMO_MODE } from '../lib/supabase';
+import { fetchIsRaining } from '../lib/weather';
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
   const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory, name, phone } = useStore();
   const [placing, setPlacing] = useState(false);
+  const [raining, setRaining] = useState(false);
   const items = Object.values(lines);
   const sub = subtotal();
   const address = selectedAddress();
+
+  // Check live weather for the delivery point to auto-apply the rain fee.
+  useEffect(() => {
+    const dest = address ? { lat: address.lat, lng: address.lng } : location;
+    if (!dest) return;
+    fetchIsRaining(dest.lat, dest.lng).then(setRaining);
+  }, [address?.id, location?.lat]);
 
   // distance from shop to the delivery address (falls back to device location)
   const shopLoc = useMemo(() => {
@@ -29,7 +38,7 @@ export default function Cart() {
     return Math.max(0.5, distanceKm(shopLoc, dest));
   }, [shopLoc, address, location]);
 
-  const fees = computeFees({ subtotal: sub, shopToCustomerKm, isRaining: false });
+  const fees = computeFees({ subtotal: sub, shopToCustomerKm, isRaining: raining });
   const eta = estimatedDeliveryMin(shopToCustomerKm);
   const canOrder = items.length > 0 && !!address && !placing;
 

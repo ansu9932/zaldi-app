@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="home" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ title: 'My Profile' }} />
+        <Stack.Screen name="orders" options={{ title: 'Order history' }} />
         <Stack.Screen name="address" options={{ title: 'Delivery address' }} />
         <Stack.Screen name="track" options={{ title: 'Track order' }} />
         <Stack.Screen name="pay" options={{ title: 'Payment' }} />
