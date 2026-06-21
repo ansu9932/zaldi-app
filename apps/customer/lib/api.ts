@@ -126,7 +126,7 @@ export async function createRazorpayOrder(amount: number, receipt: string): Prom
         Authorization: `Bearer ${anon}`,
         apikey: anon,
       },
-      body: JSON.stringify({ amount, receipt }),
+      body: JSON.stringify({ amount, receipt: String(receipt).slice(0, 40) }),
     });
     const text = await res.text();
     let data: any = {};
