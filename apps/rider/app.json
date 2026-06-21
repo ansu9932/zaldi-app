@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "next Rider",
+    "slug": "next-rider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nextrider",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#4F46E5"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.nextapp.rider",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "next Rider needs your location to receive nearby jobs and share live tracking with the customer."
+      }
+    },
+    "android": {
+      "package": "in.nextapp.rider",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "next Rider needs your location to receive nearby jobs and share live tracking."
+        }
+      ]
+    ],
+    "extra": { "router": { "origin": false } }
+  }
+}

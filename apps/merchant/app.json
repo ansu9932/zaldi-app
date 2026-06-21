@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "next Merchant",
+    "slug": "next-merchant",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nextmerchant",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.nextapp.merchant"
+    },
+    "android": {
+      "package": "in.nextapp.merchant"
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router"],
+    "extra": { "router": { "origin": false } }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "next",
+    "slug": "next-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nextcustomer",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#4F46E5"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.nextapp.customer",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "next needs your location to check if delivery is available in your area and to deliver your order."
+      }
+    },
+    "android": {
+      "package": "in.nextapp.customer",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "next needs your location to check delivery availability and deliver your order."
+        }
+      ]
+    ],
+    "extra": {
+      "router": { "origin": false }
+    }
+  }
+}

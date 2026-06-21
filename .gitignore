@@ -1,0 +1,49 @@
+# Secrets - NEVER commit real keys
+.env
+.env.local
+*.env
+!.env.example
+
+# Firebase secret files
+google-services.json
+GoogleService-Info.plist
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Expo
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Native
+ios/
+android/
+
+# Build outputs
+build/
+.next/
+out/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Supabase
+supabase/.temp/
