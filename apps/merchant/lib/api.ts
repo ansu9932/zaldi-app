@@ -49,6 +49,27 @@ export async function fetchActiveOrders(shopId?: string | null): Promise<Order[]
 export async function setStatus(id: string, status: Order['status']): Promise<void> {
   if (DEMO_MODE) return;
   await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+  notifyOrder(id);
+}
+
+/** Save this merchant's Expo push token so they get "new order" alerts. */
+export async function savePushToken(staffId: string | undefined, token: string): Promise<void> {
+  if (DEMO_MODE || !staffId) return;
+  try { await supabase.from('staff').update({ push_token: token }).eq('id', staffId); } catch { /* column may not exist yet */ }
+}
+
+/** Ask the server to send the right push for this order's current status. */
+export async function notifyOrder(orderId: string): Promise<void> {
+  if (DEMO_MODE) return;
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  try {
+    await fetch(`${base}/functions/v1/notify-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anon}`, apikey: anon },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+  } catch { /* ignore */ }
 }
 
 /** Subscribe to any order change; calls back so the screen can refresh. */

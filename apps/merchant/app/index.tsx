@@ -3,9 +3,10 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, RefreshCo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Order, fetchActiveOrders, setStatus, subscribeOrders, setMerchantOnline } from '../lib/api';
+import { Order, fetchActiveOrders, setStatus, subscribeOrders, setMerchantOnline, savePushToken } from '../lib/api';
 import { useAuth, Session } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
+import { registerForPush } from '../lib/push';
 
 const STATUS_LABEL: Record<string, string> = {
   placed: 'NEW', accepted: 'PREPARING', ready: 'READY · finding rider',
@@ -37,6 +38,7 @@ function Dashboard({ session }: { session: Session }) {
 
   useEffect(() => {
     load();
+    registerForPush().then((token) => { if (token) savePushToken(session.id, token); });
     const unsub = subscribeOrders(load);
     const poll = setInterval(load, 8000); // safety refresh
     const tick = setInterval(() => setNow(Date.now()), 1000); // countdown

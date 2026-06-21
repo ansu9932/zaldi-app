@@ -17,7 +17,7 @@ import { useStore } from '../lib/store';
 import { DEMO_MODE } from '../lib/supabase';
 import { getOrder, subscribeOrder, OrderStatusRow, cancelOrder, getOrderRider, rateOrder, RiderInfo } from '../lib/api';
 import { distanceKm } from '../lib/algorithms';
-import { LiveMap } from '../lib/LiveMap';
+import { RouteMap } from '../lib/RouteMap';
 
 const STEPS = [
   { key: 'confirmed', label: 'Order confirmed', icon: '✅' },
@@ -191,7 +191,7 @@ export default function Track() {
 
           {lastOrder ? (
             <View style={{ marginBottom: spacing.lg }}>
-              <LiveMap
+              <RouteMap
                 shop={lastOrder.shop}
                 home={{ lat: lastOrder.address.lat, lng: lastOrder.address.lng }}
                 rider={riderPos}

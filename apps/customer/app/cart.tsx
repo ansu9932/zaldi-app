@@ -14,7 +14,7 @@ const TIP_OPTIONS = [0, 10, 20, 30];
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
-  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory, name, phone } = useStore();
+  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory, name, phone, pushToken } = useStore();
   const [placing, setPlacing] = useState(false);
   const [raining, setRaining] = useState(false);
   const [tip, setTip] = useState(0);
@@ -111,6 +111,7 @@ export default function Cart() {
       discount,
       tip,
       couponCode: coupon?.code ?? null,
+      pushToken,
       total: finalTotal,
       eta,
       paymentMethod: method,

@@ -96,6 +96,9 @@ interface AppState {
   orderHistory: PastOrder[];
   addToHistory: (o: PastOrder) => void;
   markRated: (id: string) => void;
+
+  pushToken: string | null;
+  setPushToken: (t: string | null) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -173,6 +176,9 @@ export const useStore = create<AppState>()(
       orderHistory: [],
       addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
       markRated: (id) => set((s) => ({ orderHistory: s.orderHistory.map((o) => (o.id === id ? { ...o, rated: true } : o)) })),
+
+      pushToken: null,
+      setPushToken: (t) => set({ pushToken: t }),
     }),
     {
       name: 'next-customer-store',
@@ -188,6 +194,7 @@ export const useStore = create<AppState>()(
         lastOrder: s.lastOrder,
         lastOrderStatus: s.lastOrderStatus,
         favorites: s.favorites,
+        pushToken: s.pushToken,
       }),
     },
   ),

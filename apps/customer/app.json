@@ -7,6 +7,7 @@
     "scheme": "nextcustomer",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "runtimeVersion": { "policy": "appVersion" },
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
@@ -21,7 +22,10 @@
     },
     "android": {
       "package": "in.nextapp.customer",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "config": {
+        "googleMaps": { "apiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY" }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -29,11 +33,16 @@
     },
     "plugins": [
       "expo-router",
+      "expo-updates",
       [
         "expo-location",
         {
           "locationWhenInUsePermission": "next needs your location to check delivery availability and deliver your order."
         }
+      ],
+      [
+        "expo-notifications",
+        { "color": "#00D16B" }
       ]
     ],
     "extra": {
