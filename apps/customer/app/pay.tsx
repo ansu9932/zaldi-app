@@ -22,8 +22,8 @@ export default function Pay() {
         return;
       }
       const rzp = await createRazorpayOrder(amt, `rcpt_${orderId}`);
-      if (!rzp) {
-        setError('Could not start payment. Make sure the create-razorpay-order function is deployed (see GO_LIVE.md, Step 3).');
+      if (!rzp.id) {
+        setError('Could not start payment.\n' + (rzp.error ?? '') + '\n\nIf this mentions a 401/404, the function URL or key is off; if it mentions Razorpay, check the secret keys.');
         return;
       }
       await attachRazorpayOrder(String(orderId), rzp.id);

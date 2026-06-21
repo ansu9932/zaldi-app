@@ -113,22 +113,28 @@ export function subscribeOrder(id: string, cb: (row: OrderStatusRow) => void): (
 }
 
 
-const FUNCTIONS_BASE = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').replace('.supabase.co', '.functions.supabase.co');
-
 /** Ask our server (edge function) to create a Razorpay order. Secret stays on server. */
-export async function createRazorpayOrder(amount: number, receipt: string): Promise<{ id: string } | null> {
-  if (DEMO_MODE) return null;
+export async function createRazorpayOrder(amount: number, receipt: string): Promise<{ id?: string; error?: string }> {
+  if (DEMO_MODE) return { error: 'demo mode' };
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
   try {
-    const res = await fetch(`${FUNCTIONS_BASE}/create-razorpay-order`, {
+    const res = await fetch(`${base}/functions/v1/create-razorpay-order`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${anon}`,
+        apikey: anon,
+      },
       body: JSON.stringify({ amount, receipt }),
     });
-    const data = await res.json();
-    if (!res.ok || !data?.id) return null;
+    const text = await res.text();
+    let data: any = {};
+    try { data = JSON.parse(text); } catch {}
+    if (!res.ok || !data?.id) return { error: `(${res.status}) ${text.slice(0, 220)}` };
     return { id: data.id };
-  } catch {
-    return null;
+  } catch (e: any) {
+    return { error: String(e?.message ?? e) };
   }
 }
 
