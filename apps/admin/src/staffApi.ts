@@ -23,7 +23,13 @@ export async function listStaff(): Promise<Staff[]> {
 export async function addStaff(s: Omit<Staff, 'id'>): Promise<{ ok: boolean; error?: string }> {
   if (DEMO_MODE) return { ok: false, error: 'Not connected to Supabase' };
   const { error } = await supabase.from('staff').insert(s);
-  return { ok: !error, error: error?.message };
+  if (error) {
+    if (error.code === '23505' || /duplicate/i.test(error.message)) {
+      return { ok: false, error: 'That username is already taken — please choose a different one.' };
+    }
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
 }
 
 export async function resetPassword(id: string, password: string): Promise<void> {
