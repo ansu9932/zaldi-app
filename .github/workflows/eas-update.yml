@@ -1,0 +1,51 @@
+name: EAS Update (auto OTA for all 3 apps)
+
+# Whenever you push code, this sends an over-the-air update to the installed
+# apps (customer / merchant / rider) — no rebuild needed for JS/UI changes.
+#
+# ONE-TIME SETUP (required for this to work):
+#  1. Create an Expo access token: https://expo.dev -> Account Settings ->
+#     Access Tokens -> "Create token".
+#  2. In GitHub: repo -> Settings -> Secrets and variables -> Actions ->
+#     "New repository secret" -> name it EXPO_TOKEN, paste the token.
+#  3. Each app must have been set up once with `eas init` (so it has a projectId)
+#     and built once with a profile (preview or production).
+#
+# NOTE: the `--branch` below must match your build profile's channel in eas.json.
+#  - While testing with `--profile preview`  -> keep "preview".
+#  - For the public launch with `--profile production` -> change to "production".
+
+on:
+  push:
+    branches: [main, feature/blinkit-parity-and-fixes]
+  workflow_dispatch: {}
+
+jobs:
+  ota-update:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [customer, merchant, rider]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: apps/${{ matrix.app }}
+        run: npm install
+
+      - name: Publish OTA update
+        working-directory: apps/${{ matrix.app }}
+        run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
