@@ -174,7 +174,7 @@ function ProductsManager() {
     if (!name || !price || !shop) { setMsg('Name, price and shop are required.'); return; }
     const res = await addProduct({ shop_id: shop, name, category, price: Number(price), unit, image_url: image || null, in_stock: true });
     if (res.ok) { setMsg('Added ✅'); setName(''); setPrice(''); setUnit(''); setImage(''); load(); }
-    else setMsg('Error: ' + res.error);
+    else setMsg('Error: ' + res.error + (/row-level security/i.test(res.error ?? '') ? ' — run admin_products.sql in Supabase SQL Editor to allow the dashboard to add products.' : ''));
   }
 
   function downloadTemplate() {
@@ -188,19 +188,35 @@ function ProductsManager() {
   async function onUpload(e: any) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (shops.length === 0) {
+      setMsg('Add a shop first in the Shops tab — the CSV "shop" column must match a shop name.');
+      e.target.value = '';
+      return;
+    }
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter((l) => l.trim());
     const rows: Omit<DBProduct, 'id'>[] = [];
-    let skipped = 0;
+    const skips: string[] = [];
     for (let i = 1; i < lines.length; i++) {
       const c = lines[i].split(',');
       const [pname, cat, price, unit, image_url, shopName] = c.map((x) => (x ?? '').trim());
+      if (!pname) { skips.push(`Row ${i + 1}: missing name`); continue; }
+      if (!price) { skips.push(`Row ${i + 1}: missing price`); continue; }
       const shopMatch = shops.find((s) => s.name.toLowerCase() === (shopName ?? '').toLowerCase());
-      if (!pname || !price || !shopMatch) { skipped++; continue; }
+      if (!shopMatch) { skips.push(`Row ${i + 1}: shop "${shopName || '(empty)'}" not found`); continue; }
       rows.push({ shop_id: shopMatch.id, name: pname, category: cat || 'grocery', price: Number(price) || 0, unit: unit || '', image_url: image_url || null, in_stock: true });
     }
+    if (rows.length === 0) {
+      setMsg(`No products added. ${skips.slice(0, 3).join(' · ') || 'Check your CSV format.'}`);
+      e.target.value = '';
+      return;
+    }
     const res = await bulkAddProducts(rows);
-    setMsg(res.ok ? `Uploaded ${res.count} products ✅${skipped ? ` (${skipped} rows skipped)` : ''}` : 'Error: ' + res.error);
+    if (res.ok) {
+      setMsg(`Uploaded ${rows.length} products ✅${skips.length ? ` · ${skips.length} skipped (${skips.slice(0, 2).join(' · ')})` : ''}`);
+    } else {
+      setMsg('Error: ' + res.error + (/row-level security/i.test(res.error ?? '') ? ' — run admin_products.sql in Supabase.' : ''));
+    }
     e.target.value = '';
     load();
   }
