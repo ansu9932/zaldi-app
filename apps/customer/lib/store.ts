@@ -75,6 +75,8 @@ interface AppState {
 
   lastOrder: LastOrder | null;
   setLastOrder: (o: LastOrder) => void;
+  lastOrderStatus: string | null;
+  setLastOrderStatus: (s: string) => void;
 
   orderHistory: PastOrder[];
   addToHistory: (o: PastOrder) => void;
@@ -129,7 +131,9 @@ export const useStore = create<AppState>()(
       subtotal: () => Object.values(get().lines).reduce((s, l) => s + l.product.price * l.qty, 0),
 
       lastOrder: null,
-      setLastOrder: (o) => set({ lastOrder: o }),
+      setLastOrder: (o) => set({ lastOrder: o, lastOrderStatus: 'placed' }),
+      lastOrderStatus: null,
+      setLastOrderStatus: (st) => set({ lastOrderStatus: st }),
 
       orderHistory: [],
       addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
@@ -145,6 +149,8 @@ export const useStore = create<AppState>()(
         selectedAddressId: s.selectedAddressId,
         lines: s.lines,
         orderHistory: s.orderHistory,
+        lastOrder: s.lastOrder,
+        lastOrderStatus: s.lastOrderStatus,
       }),
     },
   ),

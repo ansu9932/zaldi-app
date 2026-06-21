@@ -48,6 +48,7 @@ const HOME = { x: PANEL_W - 70, y: PANEL_H - 90 };
 export default function Track() {
   const insets = useSafeAreaInsets();
   const { lastOrder } = useStore();
+  const setLastOrderStatus = useStore((s) => s.setLastOrderStatus);
   const [step, setStep] = useState(0);
   const [riderDist, setRiderDist] = useState<number | null>(null);
   const t = useRef(new Animated.Value(0)).current;
@@ -67,6 +68,7 @@ export default function Track() {
     const applyRow = (row: OrderStatusRow) => {
       if (!mounted) return;
       setStep(statusToStep(row.status));
+      setLastOrderStatus(row.status);
       if (row.rider_lat != null && row.rider_lng != null && lastOrder) {
         const rider = { lat: row.rider_lat, lng: row.rider_lng };
         const home = { lat: lastOrder.address.lat, lng: lastOrder.address.lng };

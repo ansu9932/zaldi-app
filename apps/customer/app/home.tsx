@@ -19,6 +19,7 @@ import { CATEGORIES, Product } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { ProductImage } from '../lib/ProductImage';
 import { useCatalog } from '../lib/useCatalog';
+import { ActiveOrderBar } from '../lib/ActiveOrderBar';
 
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -27,6 +28,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const cartCount = count();
   const addr = selectedAddress();
+  const lastOrder = useStore((s) => s.lastOrder);
+  const lastOrderStatus = useStore((s) => s.lastOrderStatus);
+  const showActive = !!lastOrder && lastOrderStatus !== 'delivered' && lastOrderStatus !== 'cancelled';
   const { products } = useCatalog();
   const byCat = (id: string) => products.filter((p) => p.category === id);
   const fast = products.filter((p) => p.tag === 'FAST');
@@ -128,7 +132,7 @@ export default function Home() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 170 }} showsVerticalScrollIndicator={false}>
         {/* Promo banner */}
         <View style={styles.bannerWrap}>
           <View style={styles.banner}>
@@ -167,16 +171,18 @@ export default function Home() {
         <ProductRow title="🥛 Dairy & Bread" data={byCat('dairy')} onSeeAll={() => router.push('/category/dairy')} />
       </ScrollView>
 
-      {cartCount > 0 && (
-        <TouchableOpacity
-          style={[styles.cartBar, { paddingBottom: insets.bottom + 12 }]}
-          onPress={() => router.push('/cart')}
-        >
-          <Text style={styles.cartBarText}>
-            {cartCount} item{cartCount > 1 ? 's' : ''} in cart
-          </Text>
-          <Text style={styles.cartBarCta}>View Cart →</Text>
-        </TouchableOpacity>
+      {(cartCount > 0 || showActive) && (
+        <View style={[styles.bottomStack, { paddingBottom: insets.bottom, backgroundColor: showActive ? colors.ink : colors.primary }]}>
+          {cartCount > 0 && (
+            <TouchableOpacity style={styles.cartBar} onPress={() => router.push('/cart')}>
+              <Text style={styles.cartBarText}>
+                {cartCount} item{cartCount > 1 ? 's' : ''} in cart
+              </Text>
+              <Text style={styles.cartBarCta}>View Cart →</Text>
+            </TouchableOpacity>
+          )}
+          <ActiveOrderBar />
+        </View>
       )}
     </View>
   );
@@ -307,11 +313,11 @@ const styles = StyleSheet.create({
   qtySign: { color: colors.white, fontWeight: '900', fontSize: 15 },
   qtyNum: { color: colors.white, fontWeight: '800', fontSize: 13, minWidth: 14, textAlign: 'center' },
 
+  bottomStack: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   cartBar: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: colors.primary, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl, paddingTop: 14,
+    paddingHorizontal: spacing.xl, paddingVertical: 16,
   },
   cartBarText: { color: colors.white, fontWeight: '800', fontSize: 15 },
   cartBarCta: { color: colors.white, fontWeight: '900', fontSize: 15 },
