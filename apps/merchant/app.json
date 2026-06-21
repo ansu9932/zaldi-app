@@ -7,6 +7,7 @@
     "scheme": "nextmerchant",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "runtimeVersion": { "policy": "appVersion" },
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
@@ -20,7 +21,7 @@
       "package": "in.nextapp.merchant"
     },
     "web": { "bundler": "metro", "output": "single" },
-    "plugins": ["expo-router"],
+    "plugins": ["expo-router", "expo-updates", ["expo-notifications", { "color": "#00D16B" }]],
     "extra": { "router": { "origin": false } }
   }
 }

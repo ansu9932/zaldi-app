@@ -4,9 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder, fetchTodayStats, setRiderOnline } from '../lib/api';
+import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder, fetchTodayStats, setRiderOnline, savePushToken } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
+import { registerForPush } from '../lib/push';
 
 const UPI_VPA = process.env.EXPO_PUBLIC_UPI_VPA ?? '';
 
@@ -32,6 +33,7 @@ function Dashboard() {
   useEffect(() => {
     load();
     fetchTodayStats(session?.id).then((s) => { setEarnings(s.earnings); setDeliveries(s.deliveries); });
+    registerForPush().then((token) => { if (token) savePushToken(session?.id, token); });
     const unsub = subscribeOrders(load);
     const poll = setInterval(load, 8000);
     return () => { unsub(); clearInterval(poll); };

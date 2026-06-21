@@ -91,13 +91,16 @@ export async function acceptJob(id: string, riderId: string): Promise<{ ok: bool
     .eq('status', 'ready')
     .is('rider_id', null)
     .select('id');
-  return { ok: !error && !!data && data.length > 0 };
+  const ok = !error && !!data && data.length > 0;
+  if (ok) notifyOrder(id); // tell the customer "Rider on the way"
+  return { ok };
 }
 
 export async function advanceJob(id: string, current: Job['status']): Promise<void> {
   if (DEMO_MODE) return;
   const next = current === 'assigned' ? 'picked_up' : 'delivered';
   await supabase.from('orders').update({ status: next, updated_at: new Date().toISOString() }).eq('id', id);
+  notifyOrder(id);
 }
 
 /** Stream the rider's live GPS to the order so the customer can track it. */
@@ -112,6 +115,27 @@ export async function deliverOrder(id: string, paidOnline: boolean): Promise<voi
   const patch: any = { status: 'delivered', updated_at: new Date().toISOString() };
   if (paidOnline) { patch.payment_status = 'paid'; patch.payment_method = 'upi'; }
   await supabase.from('orders').update(patch).eq('id', id);
+  notifyOrder(id); // tell the customer "Delivered"
+}
+
+/** Save this rider's Expo push token so they get "new job" alerts. */
+export async function savePushToken(riderId: string | undefined, token: string): Promise<void> {
+  if (DEMO_MODE || !riderId) return;
+  try { await supabase.from('staff').update({ push_token: token }).eq('id', riderId); } catch { /* column may not exist yet */ }
+}
+
+/** Ask the server to send the right push for this order's current status. */
+export async function notifyOrder(orderId: string): Promise<void> {
+  if (DEMO_MODE) return;
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  try {
+    await fetch(`${base}/functions/v1/notify-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anon}`, apikey: anon },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+  } catch { /* ignore */ }
 }
 
 export function subscribeOrders(onChange: () => void): () => void {

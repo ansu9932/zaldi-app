@@ -23,6 +23,7 @@ export interface CreateOrderParams {
   discount?: number;
   tip?: number;
   couponCode?: string | null;
+  pushToken?: string | null;
 }
 
 export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; id: string; error?: string }> {
@@ -49,6 +50,7 @@ export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; 
         discount: p.discount ?? 0,
         tip_amount: p.tip ?? 0,
         coupon_code: p.couponCode ?? null,
+        push_token: p.pushToken ?? null,
         total: p.total,
         payment_method: p.paymentMethod,
         payment_status: p.paymentMethod === 'cod' ? 'cod' : 'pending',
@@ -67,6 +69,9 @@ export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; 
       qty: l.qty,
     }));
     await supabase.from('order_items').insert(items);
+
+    // Fire a push to the merchant ("New order") — best-effort, never blocks.
+    notifyOrder(data.id);
 
     return { ok: true, id: data.id };
   } catch (e: any) {
@@ -138,6 +143,26 @@ export async function createRazorpayOrder(amount: number, receipt: string): Prom
 export async function attachRazorpayOrder(orderId: string, rzpOrderId: string): Promise<void> {
   if (DEMO_MODE) return;
   await supabase.from('orders').update({ razorpay_order_id: rzpOrderId }).eq('id', orderId);
+}
+
+/**
+ * Ask the server to send a push notification for this order. The edge function
+ * decides who to notify (customer / merchant / riders) from the order's current
+ * status. Best-effort: failures are swallowed so they never block the UI.
+ */
+export async function notifyOrder(orderId: string): Promise<void> {
+  if (DEMO_MODE) return;
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  try {
+    await fetch(`${base}/functions/v1/notify-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anon}`, apikey: anon },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Client-side confirm (the webhook also confirms server-side as the source of truth). */

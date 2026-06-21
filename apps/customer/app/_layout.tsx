@@ -1,9 +1,18 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '../lib/brand';
+import { useStore } from '../lib/store';
+import { registerForPush } from '../lib/push';
 
 export default function RootLayout() {
+  const setPushToken = useStore((s) => s.setPushToken);
+
+  useEffect(() => {
+    registerForPush().then((token) => { if (token) setPushToken(token); });
+  }, []);
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />

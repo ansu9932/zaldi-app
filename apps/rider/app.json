@@ -7,6 +7,7 @@
     "scheme": "nextrider",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "runtimeVersion": { "policy": "appVersion" },
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
@@ -26,12 +27,14 @@
     "web": { "bundler": "metro", "output": "single" },
     "plugins": [
       "expo-router",
+      "expo-updates",
       [
         "expo-location",
         {
           "locationWhenInUsePermission": "next Rider needs your location to receive nearby jobs and share live tracking."
         }
-      ]
+      ],
+      ["expo-notifications", { "color": "#00D16B" }]
     ],
     "extra": { "router": { "origin": false } }
   }
