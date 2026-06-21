@@ -85,7 +85,7 @@ export async function deliverOrder(id: string, paidOnline: boolean): Promise<voi
 export function subscribeOrders(onChange: () => void): () => void {
   if (DEMO_MODE) return () => {};
   const channel = supabase
-    .channel('rider-orders')
+    .channel('rider-orders-' + Math.random().toString(36).slice(2))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, onChange)
     .subscribe();
   return () => supabase.removeChannel(channel);

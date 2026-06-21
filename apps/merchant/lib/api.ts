@@ -55,7 +55,7 @@ export async function setStatus(id: string, status: Order['status']): Promise<vo
 export function subscribeOrders(onChange: () => void): () => void {
   if (DEMO_MODE) return () => {};
   const channel = supabase
-    .channel('merchant-orders')
+    .channel('merchant-orders-' + Math.random().toString(36).slice(2))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, onChange)
     .subscribe();
   return () => supabase.removeChannel(channel);

@@ -102,7 +102,7 @@ export async function getOrder(id: string): Promise<OrderStatusRow | null> {
 export function subscribeOrder(id: string, cb: (row: OrderStatusRow) => void): () => void {
   if (DEMO_MODE) return () => {};
   const channel = supabase
-    .channel('cust-order-' + id)
+    .channel('cust-order-' + id + '-' + Math.random().toString(36).slice(2))
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` },
