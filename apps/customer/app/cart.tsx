@@ -1,50 +1,53 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
-import {
-  computeFees,
-  distanceKm,
-  estimatedDeliveryMin,
-  MIN_ORDER_AMOUNT,
-  SERVICE_CENTER,
-} from '../lib/algorithms';
+import { computeFees, distanceKm, estimatedDeliveryMin, SERVICE_CENTER } from '../lib/algorithms';
 import { shopById } from '../lib/catalog';
 import { useStore } from '../lib/store';
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
-  const { lines, add, remove, subtotal, location, clear } = useStore();
+  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder } = useStore();
   const [placing, setPlacing] = useState(false);
   const items = Object.values(lines);
   const sub = subtotal();
+  const address = selectedAddress();
+
+  // distance from shop to the delivery address (falls back to device location)
+  const shopLoc = useMemo(() => {
+    const first = items[0];
+    const shop = first ? shopById(first.product.shopId) : undefined;
+    return shop?.location ?? SERVICE_CENTER;
+  }, [items]);
 
   const shopToCustomerKm = useMemo(() => {
-    const first = items[0];
-    if (!first) return 2;
-    const shop = shopById(first.product.shopId);
-    const customer = location ?? SERVICE_CENTER;
-    if (!shop) return 2;
-    return Math.max(0.5, distanceKm(shop.location, customer));
-  }, [items, location]);
+    const dest = address ? { lat: address.lat, lng: address.lng } : location ?? SERVICE_CENTER;
+    return Math.max(0.5, distanceKm(shopLoc, dest));
+  }, [shopLoc, address, location]);
 
   const fees = computeFees({ subtotal: sub, shopToCustomerKm, isRaining: false });
   const eta = estimatedDeliveryMin(shopToCustomerKm);
+  const canOrder = items.length > 0 && !!address && !placing;
 
   function placeOrder(method: 'upi' | 'cod') {
-    if (!fees.meetsMinimum) return;
+    if (!address || items.length === 0) return;
     setPlacing(true);
-    // DEMO: live Razorpay + Supabase order creation comes in the Go-Live stage.
+    // DEMO: real Razorpay + Supabase order creation comes in the Go-Live stage.
     setTimeout(() => {
+      setLastOrder({
+        id: 'NX' + Date.now().toString().slice(-6),
+        total: fees.total,
+        eta,
+        paymentMethod: method,
+        address,
+        shop: shopLoc,
+      });
+      clear();
       setPlacing(false);
-      Alert.alert(
-        'Order placed! 🎉',
-        `Payment: ${method === 'upi' ? 'UPI (Razorpay)' : 'Cash on Delivery'}\n` +
-          `Total: ₹${fees.total}\nArriving in ~${eta} min.`,
-        [{ text: 'Great!', onPress: () => { clear(); router.replace('/home'); } }]
-      );
-    }, 700);
+      router.replace('/track');
+    }, 600);
   }
 
   if (items.length === 0) {
@@ -61,12 +64,34 @@ export default function Cart() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 260 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 280 }}>
         <View style={styles.etaBanner}>
           <Text style={styles.etaEmoji}>⚡</Text>
           <Text style={styles.etaText}>Arriving in ~{eta} min</Text>
         </View>
 
+        {/* Delivery address */}
+        <TouchableOpacity style={styles.addrCard} onPress={() => router.push('/address')}>
+          {address ? (
+            <>
+              <View style={styles.addrHead}>
+                <Text style={styles.addrLabel}>
+                  {address.label === 'Home' ? '🏠' : address.label === 'Work' ? '🏢' : '📍'} Deliver to {address.label}
+                </Text>
+                <Text style={styles.changeText}>Change</Text>
+              </View>
+              <Text style={styles.addrName}>{address.name} · {address.phone}</Text>
+              <Text style={styles.addrLine}>{address.line}{address.landmark ? `, ${address.landmark}` : ''}</Text>
+            </>
+          ) : (
+            <View style={styles.addrHead}>
+              <Text style={styles.addrAddText}>📍 Add delivery address & name</Text>
+              <Text style={styles.changeText}>Add</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Items */}
         <View style={styles.card}>
           {items.map((l) => (
             <View key={l.product.id} style={styles.itemRow}>
@@ -88,6 +113,7 @@ export default function Cart() {
           ))}
         </View>
 
+        {/* Bill */}
         <View style={styles.card}>
           <Text style={styles.billTitle}>Bill details</Text>
           <BillRow label="Item total" value={`₹${fees.subtotal}`} />
@@ -97,28 +123,23 @@ export default function Cart() {
           <View style={styles.divider} />
           <BillRow label="To pay" value={`₹${fees.total}`} bold />
         </View>
-
-        {!fees.meetsMinimum && (
-          <View style={styles.warnBox}>
-            <Text style={styles.warnText}>
-              Minimum order is ₹{MIN_ORDER_AMOUNT}. Add items worth ₹{fees.amountToMinimum} more
-              to place your order.
-            </Text>
-          </View>
-        )}
       </ScrollView>
 
+      {/* Checkout */}
       <View style={[styles.checkout, { paddingBottom: insets.bottom + 12 }]}>
+        {!address && (
+          <Text style={styles.needAddr}>Add a delivery address to place your order.</Text>
+        )}
         <TouchableOpacity
-          disabled={!fees.meetsMinimum || placing}
-          style={[styles.payBtn, (!fees.meetsMinimum || placing) && styles.payBtnDisabled]}
+          disabled={!canOrder}
+          style={[styles.payBtn, !canOrder && styles.payBtnDisabled]}
           onPress={() => placeOrder('upi')}
         >
           <Text style={styles.payBtnText}>Pay ₹{fees.total} via UPI</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          disabled={!fees.meetsMinimum || placing}
-          style={[styles.codBtn, (!fees.meetsMinimum || placing) && styles.codBtnDisabled]}
+          disabled={!canOrder}
+          style={[styles.codBtn, !canOrder && styles.codBtnDisabled]}
           onPress={() => placeOrder('cod')}
         >
           <Text style={styles.codBtnText}>Cash on Delivery</Text>
@@ -147,6 +168,14 @@ const styles = StyleSheet.create({
   etaEmoji: { fontSize: 18 },
   etaText: { color: colors.primaryDark, fontWeight: '800', fontSize: 15 },
 
+  addrCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  addrHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  addrLabel: { fontWeight: '800', color: colors.ink, fontSize: 14 },
+  addrAddText: { fontWeight: '800', color: colors.primaryDark, fontSize: 14 },
+  changeText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+  addrName: { color: colors.inkMuted, fontSize: 13, marginTop: 6 },
+  addrLine: { color: colors.inkMuted, fontSize: 13, marginTop: 2 },
+
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 8 },
   itemName: { fontWeight: '700', color: colors.ink, fontSize: 14 },
@@ -163,10 +192,8 @@ const styles = StyleSheet.create({
   billBold: { fontWeight: '900', color: colors.ink, fontSize: 16 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
 
-  warnBox: { backgroundColor: '#FEF3C7', borderRadius: radius.md, padding: spacing.md },
-  warnText: { color: '#92400E', fontWeight: '600', fontSize: 13 },
-
   checkout: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.lg, gap: spacing.sm },
+  needAddr: { color: colors.error, fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 2 },
   payBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center' },
   payBtnDisabled: { backgroundColor: colors.inkFaint },
   payBtnText: { color: colors.white, fontWeight: '800', fontSize: 16 },

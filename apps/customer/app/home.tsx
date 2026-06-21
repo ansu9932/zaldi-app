@@ -20,10 +20,11 @@ import { useStore } from '../lib/store';
 
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { serviceable, distanceFromCenter, setLocation, count, name } = useStore();
+  const { serviceable, distanceFromCenter, setLocation, count, name, selectedAddress } = useStore();
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const cartCount = count();
+  const addr = selectedAddress();
 
   async function checkLocation() {
     setChecking(true);
@@ -94,16 +95,18 @@ export default function Home() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
+          <Pressable style={{ flex: 1 }} onPress={() => router.push('/address')}>
             <View style={styles.statusRow}>
               <View style={styles.dotWrap}>
                 <View style={styles.dotGlow} />
                 <View style={styles.dotCore} />
               </View>
-              <Text style={styles.statusText}>SERVICEABLE AREA</Text>
+              <Text style={styles.statusText}>{addr ? `DELIVER TO ${addr.label.toUpperCase()}` : 'SERVICEABLE AREA'}</Text>
             </View>
-            <Text style={styles.address}>Contai, 721401 ▾</Text>
-          </View>
+            <Text style={styles.address} numberOfLines={1}>
+              {addr ? `${addr.line}` : 'Contai, 721401'} ▾
+            </Text>
+          </Pressable>
           <View style={styles.avatar}>
             <Text style={{ fontSize: 16 }}>👤</Text>
           </View>
