@@ -83,7 +83,9 @@ export default function RiderHome() {
               <View key={j.id} style={styles.card}>
                 <View style={styles.cardTop}>
                   <Text style={styles.code}>{j.code}</Text>
-                  <Text style={styles.payout}>₹{j.payout}</Text>
+                  <View style={styles.payoutPill}>
+                    <Text style={styles.payoutText}>Earn ₹{j.payout}</Text>
+                  </View>
                 </View>
                 <Text style={styles.route}>📍 {j.customer}</Text>
                 <Text style={styles.routeSub}>{j.dropAddress}</Text>
@@ -136,17 +138,19 @@ const styles = StyleSheet.create({
   statLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
   section: { fontSize: 16, fontWeight: '800', color: colors.ink, marginBottom: spacing.md },
   empty: { color: colors.inkMuted, fontStyle: 'italic' },
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
+  card: { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   code: { fontWeight: '900', color: colors.ink, fontSize: 16 },
   payout: { fontWeight: '900', color: colors.success, fontSize: 18 },
-  route: { fontWeight: '700', color: colors.ink, fontSize: 14, marginTop: 6 },
-  routeSub: { color: colors.inkFaint, fontSize: 12, marginTop: 1 },
-  metaRow: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
-  meta: { color: colors.inkMuted, fontSize: 13, fontWeight: '600' },
-  acceptBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center', marginTop: spacing.md },
-  acceptText: { color: colors.white, fontWeight: '800' },
-  activeCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  payoutPill: { backgroundColor: colors.primaryLight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  payoutText: { color: colors.primaryDark, fontWeight: '900', fontSize: 14 },
+  route: { fontWeight: '800', color: colors.ink, fontSize: 15, marginTop: 10 },
+  routeSub: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
+  metaRow: { flexDirection: 'row', gap: 8, marginTop: spacing.md, backgroundColor: colors.bgSoft, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
+  meta: { color: colors.inkMuted, fontSize: 13, fontWeight: '700' },
+  acceptBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: spacing.lg },
+  acceptText: { color: colors.white, fontWeight: '900', fontSize: 15 },
+  activeCard: { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   step: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
   dot: { width: 14, height: 14, borderRadius: 7 },
   stepTitle: { fontWeight: '700', fontSize: 14 },

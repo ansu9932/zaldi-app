@@ -76,3 +76,36 @@ export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; 
     return { ok: false, id: localId, error: String(e?.message ?? e) };
   }
 }
+
+
+export interface OrderStatusRow {
+  id: string;
+  status: string;
+  eta_min: number | null;
+}
+
+/** Read the current status of one order. */
+export async function getOrder(id: string): Promise<OrderStatusRow | null> {
+  if (DEMO_MODE) return null;
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, status, eta_min')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
+  return data as OrderStatusRow;
+}
+
+/** Subscribe to live status changes for one order. */
+export function subscribeOrder(id: string, cb: (row: OrderStatusRow) => void): () => void {
+  if (DEMO_MODE) return () => {};
+  const channel = supabase
+    .channel('cust-order-' + id)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` },
+      (payload: any) => cb(payload.new as OrderStatusRow),
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}

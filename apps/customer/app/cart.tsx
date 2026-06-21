@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
@@ -53,6 +53,15 @@ export default function Cart() {
       eta,
       paymentMethod: method,
     }).then((res) => {
+      if (!res.ok) {
+        setPlacing(false);
+        Alert.alert(
+          'Could not place order',
+          (res.error ?? 'Unknown error') +
+            '\n\nTip: make sure live_setup.sql was run in Supabase and the app .env has your keys.',
+        );
+        return;
+      }
       setLastOrder({ id: res.id, total: fees.total, eta, paymentMethod: method, address, shop: shopLoc });
       addToHistory({
         id: res.id,

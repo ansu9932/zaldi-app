@@ -13,14 +13,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
 import { useStore } from '../lib/store';
+import { DEMO_MODE } from '../lib/supabase';
+import { getOrder, subscribeOrder } from '../lib/api';
 
 const STEPS = [
   { key: 'confirmed', label: 'Order confirmed', icon: '✅' },
-  { key: 'packed', label: 'Packed at store', icon: '📦' },
-  { key: 'picked', label: 'Rider picked up your order', icon: '🛍️' },
+  { key: 'preparing', label: 'Preparing your order', icon: '👨‍🍳' },
+  { key: 'ready', label: 'Packed · finding a rider', icon: '📦' },
   { key: 'onway', label: 'On the way to you', icon: '🛵' },
   { key: 'delivered', label: 'Delivered', icon: '🎉' },
 ];
+
+function statusToStep(status: string): number {
+  switch (status) {
+    case 'placed': return 0;
+    case 'accepted': return 1;
+    case 'ready': return 2;
+    case 'assigned': return 3;
+    case 'picked_up': return 3;
+    case 'delivered': return 4;
+    default: return 0;
+  }
+}
 
 const RIDER = { name: 'Biswajit Das', vehicle: 'WB-30 · Scooter', rating: '4.8', phone: '+919000000000' };
 
@@ -34,36 +48,37 @@ export default function Track() {
   const insets = useSafeAreaInsets();
   const { lastOrder } = useStore();
   const [step, setStep] = useState(0);
-  const [remaining, setRemaining] = useState(lastOrder?.eta ?? 25);
   const t = useRef(new Animated.Value(0)).current;
+  const animatedOnce = useRef(false);
 
-  // advance through the order stages (simulated; real GPS arrives in go-live stage)
+  // ----- progress: real status when live, simulated when demo -----
   useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => setStep(1), 2500));
-    timers.push(setTimeout(() => setStep(2), 5500));
-    timers.push(setTimeout(() => {
-      setStep(3);
-      Animated.timing(t, { toValue: 1, duration: 12000, useNativeDriver: true }).start(({ finished }) => {
-        if (finished) setStep(4);
-      });
-    }, 8000));
-    return () => timers.forEach(clearTimeout);
+    if (DEMO_MODE || !lastOrder?.id) {
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      timers.push(setTimeout(() => setStep(1), 2500));
+      timers.push(setTimeout(() => setStep(2), 5500));
+      timers.push(setTimeout(() => setStep(3), 8000));
+      timers.push(setTimeout(() => setStep(4), 20000));
+      return () => timers.forEach(clearTimeout);
+    }
+    let mounted = true;
+    const apply = (status: string) => mounted && setStep(statusToStep(status));
+    getOrder(lastOrder.id).then((o) => o && apply(o.status));
+    const unsub = subscribeOrder(lastOrder.id, (row) => apply(row.status));
+    const poll = setInterval(() => getOrder(lastOrder.id).then((o) => o && apply(o.status)), 6000);
+    return () => { mounted = false; unsub(); clearInterval(poll); };
   }, []);
 
-  // ETA countdown
+  // animate rider marker once we reach "on the way"
   useEffect(() => {
-    if (step >= 4) {
-      setRemaining(0);
-      return;
+    if (step >= 3 && !animatedOnce.current) {
+      animatedOnce.current = true;
+      Animated.timing(t, { toValue: 1, duration: 10000, useNativeDriver: true }).start();
     }
-    const id = setInterval(() => setRemaining((r) => (r > 1 ? r - 1 : 1)), 4000);
-    return () => clearInterval(id);
   }, [step]);
 
   const riderLeft = t.interpolate({ inputRange: [0, 1], outputRange: [SHOP.x, HOME.x] });
   const riderTop = t.interpolate({ inputRange: [0, 1], outputRange: [SHOP.y, HOME.y] });
-
   const delivered = step >= 4;
 
   return (
@@ -72,119 +87,73 @@ export default function Track() {
 
       {delivered ? (
         <View style={[styles.doneWrap, { paddingTop: insets.top + 40 }]}>
-          <View style={styles.doneCircle}>
-            <Text style={{ fontSize: 60 }}>🎉</Text>
-          </View>
+          <View style={styles.doneCircle}><Text style={{ fontSize: 60 }}>🎉</Text></View>
           <Text style={styles.doneTitle}>Order delivered!</Text>
-          <Text style={styles.doneSub}>
-            Your order was delivered by {RIDER.name}. Thank you for ordering on next!
-          </Text>
+          <Text style={styles.doneSub}>Delivered by {RIDER.name}. Thank you for ordering on next!</Text>
           <View style={styles.doneCard}>
             <Text style={styles.doneRow}>Order total: ₹{lastOrder?.total ?? '--'}</Text>
-            <Text style={styles.doneRow}>
-              Paid via: {lastOrder?.paymentMethod === 'upi' ? 'UPI (Razorpay)' : 'Cash on Delivery'}
-            </Text>
+            <Text style={styles.doneRow}>Paid via: {lastOrder?.paymentMethod === 'upi' ? 'UPI (Razorpay)' : 'Cash on Delivery'}</Text>
           </View>
           <TouchableOpacity style={styles.homeBtn} onPress={() => router.replace('/home')}>
             <Text style={styles.homeBtnText}>Back to home</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.rateBtn} onPress={() => router.replace('/home')}>
-            <Text style={styles.rateText}>⭐ Rate your experience</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
-          {/* ETA */}
           <View style={styles.etaCard}>
             <Text style={styles.etaLabel}>ARRIVING IN</Text>
-            <Text style={styles.etaValue}>~{remaining} min</Text>
+            <Text style={styles.etaValue}>~{lastOrder?.eta ?? 25} min</Text>
             <Text style={styles.etaStatus}>{STEPS[step].icon} {STEPS[step].label}</Text>
           </View>
 
-          {/* Map panel */}
           <View style={styles.map}>
-            {/* grid */}
-            {[0.25, 0.5, 0.75].map((p) => (
-              <View key={'h' + p} style={[styles.gridH, { top: PANEL_H * p }]} />
-            ))}
-            {[0.25, 0.5, 0.75].map((p) => (
-              <View key={'v' + p} style={[styles.gridV, { left: PANEL_W * p }]} />
-            ))}
-            {/* route line (dotted) */}
+            {[0.25, 0.5, 0.75].map((p) => <View key={'h' + p} style={[styles.gridH, { top: PANEL_H * p }]} />)}
+            {[0.25, 0.5, 0.75].map((p) => <View key={'v' + p} style={[styles.gridV, { left: PANEL_W * p }]} />)}
             {Array.from({ length: 16 }).map((_, i) => {
               const f = i / 15;
-              return (
-                <View
-                  key={i}
-                  style={[
-                    styles.routeDot,
-                    { left: SHOP.x + (HOME.x - SHOP.x) * f + 14, top: SHOP.y + (HOME.y - SHOP.y) * f + 14 },
-                  ]}
-                />
-              );
+              return <View key={i} style={[styles.routeDot, { left: SHOP.x + (HOME.x - SHOP.x) * f + 14, top: SHOP.y + (HOME.y - SHOP.y) * f + 14 }]} />;
             })}
-            {/* shop */}
-            <View style={[styles.pin, { left: SHOP.x, top: SHOP.y }]}>
-              <Text style={styles.pinEmoji}>🏪</Text>
-            </View>
-            {/* home */}
-            <View style={[styles.pin, { left: HOME.x, top: HOME.y }]}>
-              <Text style={styles.pinEmoji}>🏠</Text>
-            </View>
-            {/* rider */}
+            <View style={[styles.pin, { left: SHOP.x, top: SHOP.y }]}><Text style={styles.pinEmoji}>🏪</Text></View>
+            <View style={[styles.pin, { left: HOME.x, top: HOME.y }]}><Text style={styles.pinEmoji}>🏠</Text></View>
             <Animated.View style={[styles.rider, { transform: [{ translateX: riderLeft }, { translateY: riderTop }] }]}>
               <Text style={{ fontSize: 22 }}>🛵</Text>
             </Animated.View>
-            <View style={styles.mapBadge}>
-              <Text style={styles.mapBadgeText}>Live tracking</Text>
-            </View>
+            <View style={styles.mapBadge}><Text style={styles.mapBadgeText}>Live tracking</Text></View>
           </View>
 
-          {/* Rider card */}
           <View style={styles.riderCard}>
-            <View style={styles.avatar}>
-              <Text style={{ fontSize: 26 }}>🧑‍✈️</Text>
-            </View>
+            <View style={styles.avatar}><Text style={{ fontSize: 26 }}>🧑‍✈️</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.riderName}>{RIDER.name}</Text>
-              <Text style={styles.riderMeta}>{RIDER.vehicle} · ⭐ {RIDER.rating}</Text>
+              <Text style={styles.riderName}>{step >= 3 ? RIDER.name : 'Assigning a rider…'}</Text>
+              <Text style={styles.riderMeta}>{step >= 3 ? `${RIDER.vehicle} · ⭐ ${RIDER.rating}` : 'We will assign the nearest rider'}</Text>
             </View>
-            <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${RIDER.phone}`)}>
-              <Text style={styles.callText}>📞 Call</Text>
-            </TouchableOpacity>
+            {step >= 3 && (
+              <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${RIDER.phone}`)}>
+                <Text style={styles.callText}>📞 Call</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Status timeline */}
           <View style={styles.timeline}>
             {STEPS.map((s, i) => {
               const done = i < step;
               const active = i === step;
               return (
                 <View key={s.key} style={styles.tlRow}>
-                  <View
-                    style={[
-                      styles.tlDot,
-                      { backgroundColor: done ? colors.success : active ? colors.primary : colors.border },
-                    ]}
-                  >
+                  <View style={[styles.tlDot, { backgroundColor: done ? colors.success : active ? colors.primary : colors.border }]}>
                     <Text style={{ fontSize: 12 }}>{done || active ? s.icon : ''}</Text>
                   </View>
-                  <Text style={[styles.tlLabel, { color: active ? colors.ink : colors.inkMuted, fontWeight: active ? '800' : '600' }]}>
-                    {s.label}
-                  </Text>
+                  <Text style={[styles.tlLabel, { color: active ? colors.ink : colors.inkMuted, fontWeight: active ? '800' : '600' }]}>{s.label}</Text>
                 </View>
               );
             })}
           </View>
 
-          {/* Delivery address */}
           {lastOrder?.address && (
             <View style={styles.addrCard}>
               <Text style={styles.addrTitle}>Delivering to</Text>
               <Text style={styles.addrName}>{lastOrder.address.label} · {lastOrder.address.name}</Text>
-              <Text style={styles.addrLine}>
-                {lastOrder.address.line}{lastOrder.address.landmark ? `, ${lastOrder.address.landmark}` : ''}
-              </Text>
+              <Text style={styles.addrLine}>{lastOrder.address.line}{lastOrder.address.landmark ? `, ${lastOrder.address.landmark}` : ''}</Text>
             </View>
           )}
         </ScrollView>
@@ -198,7 +167,6 @@ const styles = StyleSheet.create({
   etaLabel: { color: colors.inkFaint, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   etaValue: { color: colors.white, fontSize: 38, fontWeight: '900', marginVertical: 2 },
   etaStatus: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-
   map: { width: PANEL_W, height: PANEL_H, backgroundColor: '#EAF2EC', borderRadius: radius.xl, overflow: 'hidden', marginBottom: spacing.lg },
   gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(15,23,42,0.05)' },
   gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(15,23,42,0.05)' },
@@ -206,26 +174,22 @@ const styles = StyleSheet.create({
   pin: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },
   pinEmoji: { fontSize: 20 },
   rider: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, elevation: 4 },
-  mapBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: colors.white, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center' },
+  mapBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: colors.white, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
   mapBadgeText: { fontSize: 11, fontWeight: '800', color: colors.success },
-
   riderCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.bgSoft, alignItems: 'center', justifyContent: 'center' },
   riderName: { fontWeight: '800', color: colors.ink, fontSize: 15 },
   riderMeta: { color: colors.inkMuted, fontSize: 13, marginTop: 2 },
   callBtn: { backgroundColor: colors.primaryLight, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 10 },
   callText: { color: colors.primaryDark, fontWeight: '800' },
-
   timeline: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, gap: 14, marginBottom: spacing.lg },
   tlRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   tlDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   tlLabel: { fontSize: 14 },
-
   addrCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
   addrTitle: { fontSize: 12, fontWeight: '700', color: colors.inkFaint, marginBottom: 6 },
   addrName: { fontWeight: '800', color: colors.ink, fontSize: 14 },
   addrLine: { color: colors.inkMuted, fontSize: 13, marginTop: 2 },
-
   doneWrap: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.xl },
   doneCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl },
   doneTitle: { fontSize: 26, fontWeight: '900', color: colors.ink },
@@ -234,6 +198,4 @@ const styles = StyleSheet.create({
   doneRow: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   homeBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: spacing.xl, width: '100%' },
   homeBtnText: { color: colors.white, fontWeight: '900', fontSize: 16 },
-  rateBtn: { paddingVertical: 14 },
-  rateText: { color: colors.inkMuted, fontWeight: '700' },
 });
