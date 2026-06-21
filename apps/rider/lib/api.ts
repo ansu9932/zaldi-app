@@ -16,6 +16,8 @@ export interface Job {
   items: number;
   payout: number;
   status: 'ready' | 'assigned' | 'picked_up';
+  paymentMethod: string;
+  paymentStatus: string;
 }
 
 // simple payout model (matches shared/algorithms)
@@ -35,11 +37,13 @@ function mapRow(r: any): Job {
     items: (r.order_items ?? []).length,
     payout: payout(km),
     status: r.status,
+    paymentMethod: r.payment_method ?? 'cod',
+    paymentStatus: r.payment_status ?? 'pending',
   };
 }
 
 export const DEMO_JOBS: Job[] = [
-  { id: 'demoj1', code: '#NX1041', customer: 'Ananya P. (demo)', dropAddress: 'Darua, Contai', dropLat: 21.77, dropLng: 87.745, distanceKm: 1.6, total: 174, items: 4, payout: 28, status: 'ready' },
+  { id: 'demoj1', code: '#NX1041', customer: 'Ananya P. (demo)', dropAddress: 'Darua, Contai', dropLat: 21.77, dropLng: 87.745, distanceKm: 1.6, total: 174, items: 4, payout: 28, status: 'ready', paymentMethod: 'cod', paymentStatus: 'cod' },
 ];
 
 export async function fetchJobs(): Promise<Job[]> {
@@ -68,6 +72,14 @@ export async function advanceJob(id: string, current: Job['status']): Promise<vo
 export async function updateRiderLocation(orderId: string, lat: number, lng: number): Promise<void> {
   if (DEMO_MODE) return;
   await supabase.from('orders').update({ rider_lat: lat, rider_lng: lng }).eq('id', orderId);
+}
+
+/** Mark an order delivered. If paidOnline, also record UPI payment. */
+export async function deliverOrder(id: string, paidOnline: boolean): Promise<void> {
+  if (DEMO_MODE) return;
+  const patch: any = { status: 'delivered', updated_at: new Date().toISOString() };
+  if (paidOnline) { patch.payment_status = 'paid'; patch.payment_method = 'upi'; }
+  await supabase.from('orders').update(patch).eq('id', id);
 }
 
 export function subscribeOrders(onChange: () => void): () => void {

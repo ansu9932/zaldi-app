@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { orders, shops, riders, payouts, AdminOrder } from './demoData';
+import {
+  DBProduct, CATEGORY_OPTIONS, SHOP_OPTIONS,
+  listProducts, addProduct, deleteProduct, toggleStock, loadStarterCatalog,
+} from './productApi';
+import { DEMO_MODE } from './supabase';
 
-type Tab = 'orders' | 'shops' | 'riders' | 'payouts';
+type Tab = 'orders' | 'products' | 'shops' | 'riders' | 'payouts';
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'orders', label: 'Live Orders', icon: '📦' },
+  { id: 'products', label: 'Products', icon: '🧺' },
   { id: 'shops', label: 'Shops', icon: '🏪' },
   { id: 'riders', label: 'Riders', icon: '🛵' },
   { id: 'payouts', label: 'Payouts', icon: '💰' },
@@ -102,6 +108,8 @@ export default function App() {
           </div>
         )}
 
+        {tab === 'products' && <ProductsManager />}
+
         {tab === 'shops' && (
           <div className="card">
             <h3>Partner shops</h3>
@@ -169,5 +177,107 @@ export default function App() {
         )}
       </main>
     </div>
+  );
+}
+
+
+function ProductsManager() {
+  const [products, setProducts] = useState<DBProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState('');
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [price, setPrice] = useState('');
+  const [unit, setUnit] = useState('');
+  const [image, setImage] = useState('');
+  const [shop, setShop] = useState(SHOP_OPTIONS[0].id);
+
+  async function load() {
+    setLoading(true);
+    setProducts(await listProducts());
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function onAdd() {
+    if (!name || !price) { setMsg('Name and price are required.'); return; }
+    const res = await addProduct({
+      shop_id: shop, name, category, price: Number(price), unit,
+      image_url: image || null, in_stock: true,
+    });
+    if (res.ok) {
+      setMsg('Added ✅'); setName(''); setPrice(''); setUnit(''); setImage('');
+      load();
+    } else setMsg('Error: ' + res.error);
+  }
+
+  async function onSeed() {
+    const res = await loadStarterCatalog();
+    setMsg(res.ok ? `Loaded ${res.count} starter products ✅` : 'Error: ' + res.error);
+    load();
+  }
+
+  if (DEMO_MODE) {
+    return (
+      <div className="card">
+        <h3>Products</h3>
+        <p className="muted">
+          Not connected to the database yet. Create a file <b>apps/admin/.env</b> with your
+          <b> VITE_SUPABASE_URL</b> and <b>VITE_SUPABASE_ANON_KEY</b>, then restart <code>npm run dev</code>.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="card">
+        <h3>Add a product</h3>
+        <div className="form-grid">
+          <input className="inp" placeholder="Product name" value={name} onChange={(e) => setName(e.target.value)} />
+          <select className="inp" value={category} onChange={(e) => setCategory(e.target.value)}>
+            {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input className="inp" placeholder="Price ₹" type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+          <input className="inp" placeholder="Unit (e.g. 1 kg)" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <input className="inp" placeholder="Image URL (optional)" value={image} onChange={(e) => setImage(e.target.value)} />
+          <select className="inp" value={shop} onChange={(e) => setShop(e.target.value)}>
+            {SHOP_OPTIONS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div className="row-flex" style={{ marginTop: 12 }}>
+          <button className="btn" onClick={onAdd}>Add product</button>
+          <button className="btn ghost" onClick={onSeed}>Load starter catalog</button>
+          {msg && <span className="muted" style={{ alignSelf: 'center' }}>{msg}</span>}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>All products ({products.length})</h3>
+        {loading ? <p className="muted">Loading…</p> : (
+          <table>
+            <thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Price</th><th>Unit</th><th>Stock</th><th></th></tr></thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.image_url ? <img src={p.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }} /> : '—'}</td>
+                  <td><b>{p.name}</b></td>
+                  <td>{p.category}</td>
+                  <td>₹{p.price}</td>
+                  <td>{p.unit}</td>
+                  <td>
+                    <button className="btn ghost" onClick={() => { toggleStock(p.id, !p.in_stock).then(load); }}>
+                      {p.in_stock ? 'In stock' : 'Out'}
+                    </button>
+                  </td>
+                  <td><button className="btn" style={{ background: 'var(--error)' }} onClick={() => { deleteProduct(p.id).then(load); }}>Delete</button></td>
+                </tr>
+              ))}
+              {products.length === 0 && <tr><td colSpan={7} className="muted">No products yet. Click "Load starter catalog" to begin.</td></tr>}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
   );
 }

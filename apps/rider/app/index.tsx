@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import QRCode from 'react-native-qrcode-svg';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation } from '../lib/api';
+import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder } from '../lib/api';
+
+const UPI_VPA = process.env.EXPO_PUBLIC_UPI_VPA ?? '';
 
 export default function RiderHome() {
   const insets = useSafeAreaInsets();
@@ -13,6 +16,7 @@ export default function RiderHome() {
   const [earnings, setEarnings] = useState(0);
   const [deliveries, setDeliveries] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [showQR, setShowQR] = useState(false);
 
   const load = useCallback(async () => setJobs(await fetchJobs()), []);
 
@@ -50,12 +54,19 @@ export default function RiderHome() {
   async function onAccept(id: string) { await acceptJob(id); load(); }
   async function onAdvance(j: Job) {
     await advanceJob(j.id, j.status);
-    if (j.status === 'picked_up') {
-      setEarnings((e) => e + j.payout);
-      setDeliveries((d) => d + 1);
-    }
     load();
   }
+  async function finishDelivery(j: Job, paidOnline: boolean) {
+    await deliverOrder(j.id, paidOnline);
+    setEarnings((e) => e + j.payout);
+    setDeliveries((d) => d + 1);
+    setShowQR(false);
+    load();
+  }
+
+  const upiUrl = current
+    ? `upi://pay?pa=${encodeURIComponent(UPI_VPA)}&pn=${encodeURIComponent('next')}&am=${current.total}&cu=INR&tn=${encodeURIComponent('Order ' + current.code)}`
+    : '';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
@@ -87,9 +98,28 @@ export default function RiderHome() {
               <Text style={styles.code}>{current.code}</Text>
               <Step active={current.status === 'assigned'} done={current.status === 'picked_up'} title="Pick up from store" sub="Kanthi Fresh Mart, Central Market" onNav={() => openMaps(21.779, 87.752)} />
               <Step active={current.status === 'picked_up'} done={false} title="Deliver to customer" sub={`${current.customer} · ${current.dropAddress}`} onNav={() => openMaps(current.dropLat, current.dropLng)} />
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => onAdvance(current)}>
-                <Text style={styles.primaryBtnText}>{current.status === 'assigned' ? 'Picked up order' : 'Mark as delivered'}</Text>
-              </TouchableOpacity>
+              {current.status === 'assigned' ? (
+                <TouchableOpacity style={styles.primaryBtn} onPress={() => onAdvance(current)}>
+                  <Text style={styles.primaryBtnText}>Picked up order</Text>
+                </TouchableOpacity>
+              ) : current.paymentMethod === 'cod' && current.paymentStatus !== 'paid' ? (
+                <>
+                  <View style={styles.collectRow}>
+                    <Text style={styles.collectLabel}>Collect</Text>
+                    <Text style={styles.collectAmount}>₹{current.total}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.upiBtn} onPress={() => setShowQR(true)}>
+                    <Text style={styles.upiBtnText}>📲 Collect via UPI (show QR)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.cashBtn} onPress={() => finishDelivery(current, false)}>
+                    <Text style={styles.cashBtnText}>💵 Cash received · Mark delivered</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity style={styles.primaryBtn} onPress={() => finishDelivery(current, false)}>
+                  <Text style={styles.primaryBtnText}>Mark as delivered (paid)</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </>
         ) : (
@@ -121,6 +151,32 @@ export default function RiderHome() {
           </>
         )}
       </ScrollView>
+
+      {/* UPI QR collection modal */}
+      <Modal visible={showQR} transparent animationType="slide" onRequestClose={() => setShowQR(false)}>
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Scan to pay ₹{current?.total}</Text>
+            <Text style={styles.modalSub}>Ask the customer to scan with any UPI app</Text>
+            <View style={styles.qrBox}>
+              {UPI_VPA ? (
+                <QRCode value={upiUrl} size={200} />
+              ) : (
+                <Text style={styles.qrWarn}>Set EXPO_PUBLIC_UPI_VPA in the rider .env to your UPI ID to enable QR.</Text>
+              )}
+            </View>
+            {!!UPI_VPA && <Text style={styles.vpaText}>{UPI_VPA}</Text>}
+            {current && (
+              <TouchableOpacity style={styles.paidBtn} onPress={() => finishDelivery(current, true)}>
+                <Text style={styles.paidBtnText}>✅ Payment received · Mark delivered</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQR(false)}>
+              <Text style={styles.closeText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -176,4 +232,22 @@ const styles = StyleSheet.create({
   navText: { color: colors.primaryDark, fontWeight: '800', fontSize: 12 },
   primaryBtn: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: spacing.lg },
   primaryBtnText: { color: colors.white, fontWeight: '900', fontSize: 15 },
+  collectRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 8, marginTop: spacing.lg },
+  collectLabel: { color: colors.inkMuted, fontWeight: '700', fontSize: 14 },
+  collectAmount: { color: colors.ink, fontWeight: '900', fontSize: 26 },
+  upiBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: spacing.md },
+  upiBtnText: { color: colors.white, fontWeight: '900', fontSize: 15 },
+  cashBtn: { backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: spacing.sm },
+  cashBtnText: { color: colors.ink, fontWeight: '800', fontSize: 15 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: colors.white, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, padding: spacing.xl, alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '900', color: colors.ink },
+  modalSub: { color: colors.inkMuted, fontSize: 13, marginTop: 4, marginBottom: spacing.lg },
+  qrBox: { padding: spacing.lg, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, minHeight: 220, alignItems: 'center', justifyContent: 'center' },
+  qrWarn: { color: colors.error, textAlign: 'center', fontSize: 13, paddingHorizontal: 20 },
+  vpaText: { color: colors.inkMuted, fontWeight: '700', marginTop: spacing.md },
+  paidBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: spacing.lg, width: '100%' },
+  paidBtnText: { color: colors.white, fontWeight: '900', fontSize: 15 },
+  closeBtn: { paddingVertical: 14, marginTop: 4 },
+  closeText: { color: colors.inkMuted, fontWeight: '700' },
 });

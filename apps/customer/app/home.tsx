@@ -15,9 +15,10 @@ import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { isServiceable, SERVICE_RADIUS_KM } from '../lib/algorithms';
-import { CATEGORIES, bestSellers, productsByCategory, Product } from '../lib/catalog';
+import { CATEGORIES, Product } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { ProductImage } from '../lib/ProductImage';
+import { useCatalog } from '../lib/useCatalog';
 
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -26,6 +27,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const cartCount = count();
   const addr = selectedAddress();
+  const { products } = useCatalog();
+  const byCat = (id: string) => products.filter((p) => p.category === id);
+  const fast = products.filter((p) => p.tag === 'FAST');
+  const bestList = fast.length ? fast : products.slice(0, 8);
 
   async function checkLocation() {
     setChecking(true);
@@ -156,10 +161,10 @@ export default function Home() {
         </View>
 
         {/* Product rows */}
-        <ProductRow title="⚡ Bestsellers" data={bestSellers()} />
-        <ProductRow title="🍎 Fresh Fruits" data={productsByCategory('fruits')} onSeeAll={() => router.push('/category/fruits')} />
-        <ProductRow title="🥬 Vegetables" data={productsByCategory('vegetables')} onSeeAll={() => router.push('/category/vegetables')} />
-        <ProductRow title="🥛 Dairy & Bread" data={productsByCategory('dairy')} onSeeAll={() => router.push('/category/dairy')} />
+        <ProductRow title="⚡ Bestsellers" data={bestList} />
+        <ProductRow title="🍎 Fresh Fruits" data={byCat('fruits')} onSeeAll={() => router.push('/category/fruits')} />
+        <ProductRow title="🥬 Vegetables" data={byCat('vegetables')} onSeeAll={() => router.push('/category/vegetables')} />
+        <ProductRow title="🥛 Dairy & Bread" data={byCat('dairy')} onSeeAll={() => router.push('/category/dairy')} />
       </ScrollView>
 
       {cartCount > 0 && (

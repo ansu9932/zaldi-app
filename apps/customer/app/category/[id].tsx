@@ -5,6 +5,7 @@ import { colors, radius, spacing } from '../../lib/brand';
 import { productsByCategory, CATEGORIES, Product } from '../../lib/catalog';
 import { useStore } from '../../lib/store';
 import { ProductImage } from '../../lib/ProductImage';
+import { useCatalog } from '../../lib/useCatalog';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
@@ -14,7 +15,8 @@ export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { lines, add, remove, count } = useStore();
-  const products = productsByCategory(id ?? '');
+  const { products: allProducts } = useCatalog();
+  const products = allProducts.filter((p) => p.category === (id ?? ''));
   const cat = CATEGORIES.find((c) => c.id === id);
   const cartCount = count();
 

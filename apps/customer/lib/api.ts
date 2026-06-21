@@ -145,3 +145,37 @@ export async function markOrderPaid(orderId: string, paymentId: string): Promise
     .update({ payment_status: 'paid', razorpay_payment_id: paymentId, status: 'placed' })
     .eq('id', orderId);
 }
+
+
+import { PRODUCTS, Product } from './catalog';
+
+const UUID_TO_LOCAL: Record<string, string> = {
+  '11111111-1111-1111-1111-111111111111': 's1',
+  '22222222-2222-2222-2222-222222222222': 's2',
+  '33333333-3333-3333-3333-333333333333': 's3',
+};
+
+/** Load the product catalog from the database (managed in Admin). Falls back to the built-in catalog. */
+export async function getCatalogProducts(): Promise<Product[]> {
+  if (DEMO_MODE) return PRODUCTS;
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, shop_id, name, category, price, unit, image_url, in_stock')
+      .eq('in_stock', true);
+    if (error || !data || data.length === 0) return PRODUCTS;
+    return data.map((r: any) => ({
+      id: r.id,
+      shopId: UUID_TO_LOCAL[r.shop_id] ?? 's1',
+      name: r.name,
+      category: r.category,
+      price: Number(r.price),
+      unit: r.unit ?? '',
+      emoji: '🛍️',
+      image: r.image_url ?? undefined,
+      q: r.name,
+    }));
+  } catch {
+    return PRODUCTS;
+  }
+}

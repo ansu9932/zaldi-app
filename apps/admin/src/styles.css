@@ -90,3 +90,10 @@ tr:last-child td { border-bottom: none; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .main { padding: 20px; }
 }
+
+
+/* Product manager */
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.inp { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; width: 100%; }
+.inp:focus { outline: none; border-color: var(--primary); }
+@media (max-width: 820px) { .form-grid { grid-template-columns: 1fr; } }

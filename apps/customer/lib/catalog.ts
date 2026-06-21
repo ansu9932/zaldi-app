@@ -23,6 +23,7 @@ export interface Product {
   emoji: string;
   tag?: string; // e.g. "FAST", "OFFER"
   q?: string; // optional image search keyword
+  image?: string; // explicit photo URL (from admin/DB), overrides keyword
 }
 
 export interface Category {
@@ -160,6 +161,7 @@ function hashCode(s: string): number {
 }
 
 export function productImageUrl(p: Product): string {
+  if (p.image) return p.image;
   const kw = p.q ?? p.name;
   const extra = CAT_KEYWORD[p.category] ?? '';
   const keyword = extra ? `${kw},${extra}` : kw;
