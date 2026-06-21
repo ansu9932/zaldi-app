@@ -35,13 +35,13 @@ export const DEMO_ORDERS: Order[] = [
 
 export async function fetchActiveOrders(shopId?: string | null): Promise<Order[]> {
   if (DEMO_MODE) return DEMO_ORDERS;
-  let q = supabase
+  if (!shopId) return []; // a merchant with no assigned shop sees nothing
+  const { data, error } = await supabase
     .from('orders')
     .select('*, order_items(name, qty, price)')
+    .eq('shop_id', shopId)
     .in('status', ['placed', 'accepted', 'ready', 'assigned', 'picked_up'])
     .order('created_at', { ascending: false });
-  if (shopId) q = q.eq('shop_id', shopId);
-  const { data, error } = await q;
   if (error || !data) return [];
   return data.map(mapRow);
 }

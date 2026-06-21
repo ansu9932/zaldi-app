@@ -82,6 +82,9 @@ function Dashboard({ session }: { session: Session }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
       >
         <Text style={styles.section}>🔔 New orders</Text>
+        {!session.shopId && (
+          <Text style={styles.empty}>No shop is assigned to your account. Ask the admin to assign your shop in the Staff page.</Text>
+        )}
         {newOrders.length === 0 && <Empty text="No new orders right now. Place one from the Customer app!" />}
         {newOrders.map((o) => {
           const remain = Math.max(0, 120 - Math.floor((now - new Date(o.created_at).getTime()) / 1000));

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
@@ -18,6 +18,7 @@ export default function RiderHome() {
 
 function Dashboard() {
   const insets = useSafeAreaInsets();
+  const session = useAuth((s) => s.session);
   const logout = useAuth((s) => s.logout);
   const [online, setOnline] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -26,7 +27,7 @@ function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
-  const load = useCallback(async () => setJobs(await fetchJobs()), []);
+  const load = useCallback(async () => setJobs(await fetchJobs(session?.id)), [session?.id]);
 
   useEffect(() => {
     load();
@@ -59,7 +60,11 @@ function Dashboard() {
     Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`).catch(() => {});
   }
 
-  async function onAccept(id: string) { await acceptJob(id); load(); }
+  async function onAccept(id: string) {
+    const res = await acceptJob(id, session?.id ?? '');
+    if (!res.ok) Alert.alert('Already taken', 'Another rider just accepted this order.');
+    load();
+  }
   async function onAdvance(j: Job) {
     await advanceJob(j.id, j.status);
     load();

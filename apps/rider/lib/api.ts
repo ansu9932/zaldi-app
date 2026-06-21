@@ -46,20 +46,44 @@ export const DEMO_JOBS: Job[] = [
   { id: 'demoj1', code: '#NX1041', customer: 'Ananya P. (demo)', dropAddress: 'Darua, Contai', dropLat: 21.77, dropLng: 87.745, distanceKm: 1.6, total: 174, items: 4, payout: 28, status: 'ready', paymentMethod: 'cod', paymentStatus: 'cod' },
 ];
 
-export async function fetchJobs(): Promise<Job[]> {
+export async function fetchJobs(riderId?: string): Promise<Job[]> {
   if (DEMO_MODE) return DEMO_JOBS;
-  const { data, error } = await supabase
+  // Offers = ready orders not yet taken by any rider
+  const offersQ = supabase
     .from('orders')
     .select('*, order_items(id)')
-    .in('status', ['ready', 'assigned', 'picked_up'])
+    .eq('status', 'ready')
+    .is('rider_id', null)
     .order('created_at', { ascending: true });
-  if (error || !data) return [];
-  return data.map(mapRow);
+  // Mine = orders this rider has accepted and is still delivering
+  const mineQ = riderId
+    ? supabase
+        .from('orders')
+        .select('*, order_items(id)')
+        .eq('rider_id', riderId)
+        .in('status', ['assigned', 'picked_up'])
+        .order('created_at', { ascending: true })
+    : null;
+
+  const [offers, mine] = await Promise.all([offersQ, mineQ ?? Promise.resolve({ data: [] } as any)]);
+  const rows = [...(mine?.data ?? []), ...(offers.data ?? [])];
+  return rows.map(mapRow);
 }
 
-export async function acceptJob(id: string): Promise<void> {
-  if (DEMO_MODE) return;
-  await supabase.from('orders').update({ status: 'assigned', updated_at: new Date().toISOString() }).eq('id', id);
+/**
+ * Atomically lock the order to this rider. Only succeeds if the order is still
+ * 'ready' and unassigned — so two riders can never grab the same order.
+ */
+export async function acceptJob(id: string, riderId: string): Promise<{ ok: boolean }> {
+  if (DEMO_MODE) return { ok: true };
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: 'assigned', rider_id: riderId, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'ready')
+    .is('rider_id', null)
+    .select('id');
+  return { ok: !error && !!data && data.length > 0 };
 }
 
 export async function advanceJob(id: string, current: Job['status']): Promise<void> {
