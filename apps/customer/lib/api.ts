@@ -55,7 +55,7 @@ export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; 
         total: p.total,
         payment_method: p.paymentMethod,
         payment_status: p.paymentMethod === 'cod' ? 'cod' : 'pending',
-        status: 'placed',
+        status: p.paymentMethod === 'cod' ? 'placed' : 'pending_payment',
         eta_min: p.eta,
       })
       .select('id')
@@ -82,6 +82,8 @@ export interface OrderStatusRow {
   id: string;
   status: string;
   eta_min: number | null;
+  rider_lat: number | null;
+  rider_lng: number | null;
 }
 
 /** Read the current status of one order. */
@@ -89,7 +91,7 @@ export async function getOrder(id: string): Promise<OrderStatusRow | null> {
   if (DEMO_MODE) return null;
   const { data, error } = await supabase
     .from('orders')
-    .select('id, status, eta_min')
+    .select('id, status, eta_min, rider_lat, rider_lng')
     .eq('id', id)
     .single();
   if (error || !data) return null;
@@ -108,4 +110,38 @@ export function subscribeOrder(id: string, cb: (row: OrderStatusRow) => void): (
     )
     .subscribe();
   return () => supabase.removeChannel(channel);
+}
+
+
+const FUNCTIONS_BASE = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').replace('.supabase.co', '.functions.supabase.co');
+
+/** Ask our server (edge function) to create a Razorpay order. Secret stays on server. */
+export async function createRazorpayOrder(amount: number, receipt: string): Promise<{ id: string } | null> {
+  if (DEMO_MODE) return null;
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/create-razorpay-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, receipt }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.id) return null;
+    return { id: data.id };
+  } catch {
+    return null;
+  }
+}
+
+export async function attachRazorpayOrder(orderId: string, rzpOrderId: string): Promise<void> {
+  if (DEMO_MODE) return;
+  await supabase.from('orders').update({ razorpay_order_id: rzpOrderId }).eq('id', orderId);
+}
+
+/** Client-side confirm (the webhook also confirms server-side as the source of truth). */
+export async function markOrderPaid(orderId: string, paymentId: string): Promise<void> {
+  if (DEMO_MODE) return;
+  await supabase
+    .from('orders')
+    .update({ payment_status: 'paid', razorpay_payment_id: paymentId, status: 'placed' })
+    .eq('id', orderId);
 }

@@ -14,7 +14,8 @@ import { router, Stack } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
 import { useStore } from '../lib/store';
 import { DEMO_MODE } from '../lib/supabase';
-import { getOrder, subscribeOrder } from '../lib/api';
+import { getOrder, subscribeOrder, OrderStatusRow } from '../lib/api';
+import { distanceKm } from '../lib/algorithms';
 
 const STEPS = [
   { key: 'confirmed', label: 'Order confirmed', icon: '✅' },
@@ -48,6 +49,7 @@ export default function Track() {
   const insets = useSafeAreaInsets();
   const { lastOrder } = useStore();
   const [step, setStep] = useState(0);
+  const [riderDist, setRiderDist] = useState<number | null>(null);
   const t = useRef(new Animated.Value(0)).current;
   const animatedOnce = useRef(false);
 
@@ -62,16 +64,28 @@ export default function Track() {
       return () => timers.forEach(clearTimeout);
     }
     let mounted = true;
-    const apply = (status: string) => mounted && setStep(statusToStep(status));
-    getOrder(lastOrder.id).then((o) => o && apply(o.status));
-    const unsub = subscribeOrder(lastOrder.id, (row) => apply(row.status));
-    const poll = setInterval(() => getOrder(lastOrder.id).then((o) => o && apply(o.status)), 6000);
+    const applyRow = (row: OrderStatusRow) => {
+      if (!mounted) return;
+      setStep(statusToStep(row.status));
+      if (row.rider_lat != null && row.rider_lng != null && lastOrder) {
+        const rider = { lat: row.rider_lat, lng: row.rider_lng };
+        const home = { lat: lastOrder.address.lat, lng: lastOrder.address.lng };
+        const dRemain = distanceKm(rider, home);
+        setRiderDist(dRemain);
+        const total = distanceKm(lastOrder.shop, home) || 1;
+        const prog = Math.max(0, Math.min(1, 1 - dRemain / total));
+        Animated.timing(t, { toValue: prog, duration: 1500, useNativeDriver: true }).start();
+      }
+    };
+    getOrder(lastOrder.id).then((o) => o && applyRow(o));
+    const unsub = subscribeOrder(lastOrder.id, applyRow);
+    const poll = setInterval(() => getOrder(lastOrder.id).then((o) => o && applyRow(o)), 6000);
     return () => { mounted = false; unsub(); clearInterval(poll); };
   }, []);
 
-  // animate rider marker once we reach "on the way"
+  // animate rider marker once we reach "on the way" (DEMO only; live uses real GPS)
   useEffect(() => {
-    if (step >= 3 && !animatedOnce.current) {
+    if (DEMO_MODE && step >= 3 && !animatedOnce.current) {
       animatedOnce.current = true;
       Animated.timing(t, { toValue: 1, duration: 10000, useNativeDriver: true }).start();
     }
@@ -125,7 +139,13 @@ export default function Track() {
             <View style={styles.avatar}><Text style={{ fontSize: 26 }}>🧑‍✈️</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.riderName}>{step >= 3 ? RIDER.name : 'Assigning a rider…'}</Text>
-              <Text style={styles.riderMeta}>{step >= 3 ? `${RIDER.vehicle} · ⭐ ${RIDER.rating}` : 'We will assign the nearest rider'}</Text>
+              <Text style={styles.riderMeta}>
+                {step >= 3
+                  ? riderDist != null
+                    ? `🛵 ${riderDist.toFixed(1)} km away · ⭐ ${RIDER.rating}`
+                    : `${RIDER.vehicle} · ⭐ ${RIDER.rating}`
+                  : 'We will assign the nearest rider'}
+              </Text>
             </View>
             {step >= 3 && (
               <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${RIDER.phone}`)}>

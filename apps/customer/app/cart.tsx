@@ -7,6 +7,7 @@ import { computeFees, distanceKm, estimatedDeliveryMin, SERVICE_CENTER } from '.
 import { shopById } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { createOrder } from '../lib/api';
+import { DEMO_MODE } from '../lib/supabase';
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
@@ -74,7 +75,11 @@ export default function Cart() {
       });
       clear();
       setPlacing(false);
-      router.replace('/track');
+      if (method === 'upi' && !DEMO_MODE) {
+        router.replace(`/pay?orderId=${encodeURIComponent(res.id)}&amount=${fees.total}`);
+      } else {
+        router.replace('/track');
+      }
     });
   }
 

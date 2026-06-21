@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders } from '../lib/api';
+import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation } from '../lib/api';
 
 export default function RiderHome() {
   const insets = useSafeAreaInsets();
@@ -24,6 +25,22 @@ export default function RiderHome() {
 
   const current = jobs.find((j) => j.status === 'assigned' || j.status === 'picked_up') ?? null;
   const offers = jobs.filter((j) => j.status === 'ready');
+
+  // Stream live GPS to the active order so the customer can track the rider.
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    async function start() {
+      if (!current) return;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 15 },
+        (pos) => updateRiderLocation(current.id, pos.coords.latitude, pos.coords.longitude),
+      );
+    }
+    start();
+    return () => { if (sub) sub.remove(); };
+  }, [current?.id]);
 
   function openMaps(lat: number | null, lng: number | null) {
     if (lat == null || lng == null) return;
@@ -49,8 +66,8 @@ export default function RiderHome() {
             <Text style={styles.sub}>next Rider · Contai {DEMO_MODE ? '· DEMO' : '· LIVE'}</Text>
           </View>
           <View style={styles.onlineBox}>
-            <Text style={[styles.onlineText, { color: online ? colors.primary : '#94A3B8' }]}>{online ? 'Online' : 'Offline'}</Text>
-            <Switch value={online} onValueChange={setOnline} trackColor={{ true: colors.primary, false: colors.inkMuted }} thumbColor={colors.white} />
+            <Text style={[styles.onlineText, { color: online ? colors.white : 'rgba(255,255,255,0.65)' }]}>{online ? 'Online' : 'Offline'}</Text>
+            <Switch value={online} onValueChange={setOnline} trackColor={{ true: colors.ink, false: 'rgba(255,255,255,0.35)' }} thumbColor={colors.white} ios_backgroundColor="rgba(255,255,255,0.35)" />
           </View>
         </View>
         <View style={styles.statsRow}>

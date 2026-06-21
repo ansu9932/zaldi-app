@@ -64,6 +64,12 @@ export async function advanceJob(id: string, current: Job['status']): Promise<vo
   await supabase.from('orders').update({ status: next, updated_at: new Date().toISOString() }).eq('id', id);
 }
 
+/** Stream the rider's live GPS to the order so the customer can track it. */
+export async function updateRiderLocation(orderId: string, lat: number, lng: number): Promise<void> {
+  if (DEMO_MODE) return;
+  await supabase.from('orders').update({ rider_lat: lat, rider_lng: lng }).eq('id', orderId);
+}
+
 export function subscribeOrders(onChange: () => void): () => void {
   if (DEMO_MODE) return () => {};
   const channel = supabase
