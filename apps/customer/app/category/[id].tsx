@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../../lib/brand';
 import { productsByCategory, CATEGORIES, Product } from '../../lib/catalog';
 import { useStore } from '../../lib/store';
+import { ProductImage } from '../../lib/ProductImage';
 
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,8 +46,8 @@ export default function CategoryScreen() {
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <View style={styles.thumb}>
-              <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
+            <View style={{ width: 60 }}>
+              <ProductImage product={item} size={60} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>

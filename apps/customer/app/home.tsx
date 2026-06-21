@@ -17,6 +17,7 @@ import { colors, radius, spacing } from '../lib/brand';
 import { isServiceable, SERVICE_RADIUS_KM } from '../lib/algorithms';
 import { CATEGORIES, bestSellers, productsByCategory, Product } from '../lib/catalog';
 import { useStore } from '../lib/store';
+import { ProductImage } from '../lib/ProductImage';
 
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -107,9 +108,9 @@ export default function Home() {
               {addr ? `${addr.line}` : 'Contai, 721401'} ▾
             </Text>
           </Pressable>
-          <View style={styles.avatar}>
+          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/profile')}>
             <Text style={{ fontSize: 16 }}>👤</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.search}>
@@ -203,9 +204,7 @@ function ProductRow({ title, data, onSeeAll }: { title: string; data: Product[];
                   <Text style={styles.pTagText}>{item.tag}</Text>
                 </View>
               )}
-              <View style={styles.pImg}>
-                <Text style={{ fontSize: 44 }}>{item.emoji}</Text>
-              </View>
+              <ProductImage product={item} size={90} style={{ marginBottom: 10 }} />
               <Text style={styles.pName} numberOfLines={1}>{item.name}</Text>
               <Text style={styles.pUnit}>{item.unit}</Text>
               <View style={styles.pBottom}>

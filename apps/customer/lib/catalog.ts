@@ -22,6 +22,7 @@ export interface Product {
   unit: string;
   emoji: string;
   tag?: string; // e.g. "FAST", "OFFER"
+  q?: string; // optional image search keyword
 }
 
 export interface Category {
@@ -134,4 +135,34 @@ export function searchProducts(q: string): Product[] {
 
 export function shopById(id: string): Shop | undefined {
   return SHOPS.find((s) => s.id === id);
+}
+
+/**
+ * Real product photo URL (keyword-based, stable per product).
+ * Falls back to the product emoji in the UI if the image can't load.
+ * In go-live, we replace this with curated photos stored in Supabase.
+ */
+const CAT_KEYWORD: Record<string, string> = {
+  fruits: 'fruit',
+  vegetables: 'vegetable',
+  dairy: 'dairy',
+  grocery: 'grocery',
+  snacks: 'snack',
+  beverages: 'drink',
+  medicines: 'medicine',
+  personal: 'toiletry',
+};
+
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i);
+  return Math.abs(h);
+}
+
+export function productImageUrl(p: Product): string {
+  const kw = p.q ?? p.name;
+  const extra = CAT_KEYWORD[p.category] ?? '';
+  const keyword = extra ? `${kw},${extra}` : kw;
+  const lock = hashCode(p.id) % 1000;
+  return `https://loremflickr.com/300/300/${encodeURIComponent(keyword)}?lock=${lock}`;
 }

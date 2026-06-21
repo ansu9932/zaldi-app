@@ -9,7 +9,7 @@ import { useStore } from '../lib/store';
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
-  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder } = useStore();
+  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory } = useStore();
   const [placing, setPlacing] = useState(false);
   const items = Object.values(lines);
   const sub = subtotal();
@@ -34,15 +34,26 @@ export default function Cart() {
   function placeOrder(method: 'upi' | 'cod') {
     if (!address || items.length === 0) return;
     setPlacing(true);
+    const orderId = 'NX' + Date.now().toString().slice(-6);
+    const itemCount = items.reduce((s, l) => s + l.qty, 0);
     // DEMO: real Razorpay + Supabase order creation comes in the Go-Live stage.
     setTimeout(() => {
       setLastOrder({
-        id: 'NX' + Date.now().toString().slice(-6),
+        id: orderId,
         total: fees.total,
         eta,
         paymentMethod: method,
         address,
         shop: shopLoc,
+      });
+      addToHistory({
+        id: orderId,
+        total: fees.total,
+        paymentMethod: method,
+        createdAt: Date.now(),
+        itemCount,
+        addressLabel: address.label,
+        status: 'Delivered',
       });
       clear();
       setPlacing(false);

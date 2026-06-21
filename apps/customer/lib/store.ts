@@ -30,6 +30,16 @@ export interface LastOrder {
   shop: LatLng;
 }
 
+export interface PastOrder {
+  id: string;
+  total: number;
+  paymentMethod: 'upi' | 'cod';
+  createdAt: number;
+  itemCount: number;
+  addressLabel: string;
+  status: 'Delivered';
+}
+
 interface AppState {
   // auth
   loggedIn: boolean;
@@ -63,6 +73,10 @@ interface AppState {
   // last placed order (for tracking screen)
   lastOrder: LastOrder | null;
   setLastOrder: (o: LastOrder) => void;
+
+  // order history
+  orderHistory: PastOrder[];
+  addToHistory: (o: PastOrder) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -118,4 +132,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   lastOrder: null,
   setLastOrder: (o) => set({ lastOrder: o }),
+
+  orderHistory: [],
+  addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
 }));
