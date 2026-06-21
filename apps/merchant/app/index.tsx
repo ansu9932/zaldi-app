@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
 import { Order, fetchActiveOrders, setStatus, subscribeOrders } from '../lib/api';
+import { useAuth, Session } from '../lib/auth';
+import { LoginScreen } from '../lib/LoginScreen';
 
 const STATUS_LABEL: Record<string, string> = {
   placed: 'NEW', accepted: 'PREPARING', ready: 'READY · finding rider',
@@ -15,16 +17,23 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function MerchantHome() {
+  const session = useAuth((s) => s.session);
+  if (!session) return <LoginScreen />;
+  return <Dashboard session={session} />;
+}
+
+function Dashboard({ session }: { session: Session }) {
   const insets = useSafeAreaInsets();
+  const logout = useAuth((s) => s.logout);
   const [online, setOnline] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
-    const data = await fetchActiveOrders();
+    const data = await fetchActiveOrders(session.shopId);
     setOrders(data);
-  }, []);
+  }, [session.shopId]);
 
   useEffect(() => {
     load();
@@ -47,15 +56,18 @@ export default function MerchantHome() {
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.shop}>Kanthi Fresh Mart</Text>
-            <Text style={styles.sub}>next Merchant · Contai {DEMO_MODE ? '· DEMO' : '· LIVE'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.shop}>{session.name}</Text>
+            <Text style={styles.sub}>next Merchant {DEMO_MODE ? '· DEMO' : '· LIVE'}</Text>
           </View>
           <View style={styles.onlineBox}>
             <Text style={[styles.onlineText, { color: online ? colors.primary : colors.inkFaint }]}>
               {online ? 'Online' : 'Offline'}
             </Text>
             <Switch value={online} onValueChange={setOnline} trackColor={{ true: colors.primary, false: colors.inkFaint }} thumbColor={colors.white} />
+            <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+              <Text style={styles.logoutText}>Log out</Text>
+            </TouchableOpacity>
           </View>
         </View>
         <View style={styles.statsRow}>
@@ -156,6 +168,8 @@ const styles = StyleSheet.create({
   sub: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
   onlineBox: { alignItems: 'center' },
   onlineText: { fontWeight: '800', fontSize: 12, marginBottom: 2 },
+  logoutBtn: { marginTop: 6 },
+  logoutText: { color: colors.inkFaint, fontWeight: '700', fontSize: 11 },
   statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
   stat: { flex: 1, backgroundColor: '#1E293B', borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
   statValue: { color: colors.white, fontSize: 22, fontWeight: '900' },

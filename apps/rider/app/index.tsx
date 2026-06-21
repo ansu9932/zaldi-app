@@ -6,11 +6,20 @@ import QRCode from 'react-native-qrcode-svg';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
 import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { LoginScreen } from '../lib/LoginScreen';
 
 const UPI_VPA = process.env.EXPO_PUBLIC_UPI_VPA ?? '';
 
 export default function RiderHome() {
+  const session = useAuth((s) => s.session);
+  if (!session) return <LoginScreen />;
+  return <Dashboard />;
+}
+
+function Dashboard() {
   const insets = useSafeAreaInsets();
+  const logout = useAuth((s) => s.logout);
   const [online, setOnline] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [earnings, setEarnings] = useState(0);
@@ -73,12 +82,15 @@ export default function RiderHome() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.name}>Hi, Biswajit 👋</Text>
+            <Text style={styles.name}>Hi, {useAuth.getState().session?.name ?? 'Rider'} 👋</Text>
             <Text style={styles.sub}>next Rider · Contai {DEMO_MODE ? '· DEMO' : '· LIVE'}</Text>
           </View>
           <View style={styles.onlineBox}>
             <Text style={[styles.onlineText, { color: online ? colors.white : 'rgba(255,255,255,0.65)' }]}>{online ? 'Online' : 'Offline'}</Text>
             <Switch value={online} onValueChange={setOnline} trackColor={{ true: colors.ink, false: 'rgba(255,255,255,0.35)' }} thumbColor={colors.white} ios_backgroundColor="rgba(255,255,255,0.35)" />
+            <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+              <Text style={styles.logoutText}>Log out</Text>
+            </TouchableOpacity>
           </View>
         </View>
         <View style={styles.statsRow}>
@@ -205,6 +217,8 @@ const styles = StyleSheet.create({
   sub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
   onlineBox: { alignItems: 'center' },
   onlineText: { fontWeight: '800', fontSize: 12, marginBottom: 2 },
+  logoutBtn: { marginTop: 6 },
+  logoutText: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 11 },
   statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
   stat: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
   statValue: { color: colors.white, fontSize: 20, fontWeight: '900' },

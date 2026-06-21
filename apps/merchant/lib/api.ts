@@ -33,13 +33,15 @@ export const DEMO_ORDERS: Order[] = [
   { id: 'demo1', code: '#NX1042', customer: 'Rahul D. (demo)', area: 'Darua, Contai', items: [{ name: 'Atta', qty: 1, price: 220 }, { name: 'Milk', qty: 2, price: 28 }], total: 276, status: 'placed', created_at: new Date().toISOString() },
 ];
 
-export async function fetchActiveOrders(): Promise<Order[]> {
+export async function fetchActiveOrders(shopId?: string | null): Promise<Order[]> {
   if (DEMO_MODE) return DEMO_ORDERS;
-  const { data, error } = await supabase
+  let q = supabase
     .from('orders')
     .select('*, order_items(name, qty, price)')
     .in('status', ['placed', 'accepted', 'ready', 'assigned', 'picked_up'])
     .order('created_at', { ascending: false });
+  if (shopId) q = q.eq('shop_id', shopId);
+  const { data, error } = await q;
   if (error || !data) return [];
   return data.map(mapRow);
 }

@@ -6,12 +6,17 @@ import {
 } from './productApi';
 import { DEMO_MODE } from './supabase';
 import { listLiveOrders, LiveOrder } from './orderApi';
+import {
+  Staff, SHOP_OPTIONS as STAFF_SHOPS,
+  listStaff, addStaff, resetPassword, setActive, deleteStaff,
+} from './staffApi';
 
-type Tab = 'orders' | 'products' | 'shops' | 'riders' | 'payouts';
+type Tab = 'orders' | 'products' | 'staff' | 'shops' | 'riders' | 'payouts';
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'orders', label: 'Live Orders', icon: '📦' },
   { id: 'products', label: 'Products', icon: '🧺' },
+  { id: 'staff', label: 'Staff Logins', icon: '🔑' },
   { id: 'shops', label: 'Shops', icon: '🏪' },
   { id: 'riders', label: 'Riders', icon: '🛵' },
   { id: 'payouts', label: 'Payouts', icon: '💰' },
@@ -130,6 +135,7 @@ export default function App() {
         )}
 
         {tab === 'products' && <ProductsManager />}
+        {tab === 'staff' && <StaffManager />}
 
         {tab === 'shops' && (
           <div className="card">
@@ -295,6 +301,105 @@ function ProductsManager() {
                 </tr>
               ))}
               {products.length === 0 && <tr><td colSpan={7} className="muted">No products yet. Click "Load starter catalog" to begin.</td></tr>}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
+  );
+}
+
+
+function StaffManager() {
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState('');
+  const [role, setRole] = useState<'merchant' | 'rider'>('merchant');
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [shop, setShop] = useState(STAFF_SHOPS[0].id);
+
+  async function load() {
+    setLoading(true);
+    setStaff(await listStaff());
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function onAdd() {
+    if (!name || !username || !password) { setMsg('Name, username and password are required.'); return; }
+    const res = await addStaff({
+      role, name, username, password,
+      shop_id: role === 'merchant' ? shop : null,
+      active: true,
+    });
+    if (res.ok) { setMsg('Login created ✅'); setName(''); setUsername(''); setPassword(''); load(); }
+    else setMsg('Error: ' + res.error);
+  }
+
+  async function onReset(id: string) {
+    const np = window.prompt('Enter a new password for this user:');
+    if (np) { await resetPassword(id, np); setMsg('Password reset ✅'); load(); }
+  }
+
+  if (DEMO_MODE) {
+    return (
+      <div className="card">
+        <h3>Staff Logins</h3>
+        <p className="muted">Connect the dashboard first (create <b>apps/admin/.env</b>), then reload.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="card">
+        <h3>Create a login (merchant or rider)</h3>
+        <div className="form-grid">
+          <select className="inp" value={role} onChange={(e) => setRole(e.target.value as any)}>
+            <option value="merchant">Merchant</option>
+            <option value="rider">Rider</option>
+          </select>
+          <input className="inp" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="inp" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input className="inp" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          {role === 'merchant' && (
+            <select className="inp" value={shop} onChange={(e) => setShop(e.target.value)}>
+              {STAFF_SHOPS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+        </div>
+        <div className="row-flex" style={{ marginTop: 12 }}>
+          <button className="btn" onClick={onAdd}>Create login</button>
+          {msg && <span className="muted" style={{ alignSelf: 'center' }}>{msg}</span>}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>All logins ({staff.length})</h3>
+        {loading ? <p className="muted">Loading…</p> : (
+          <table>
+            <thead><tr><th>Role</th><th>Name</th><th>Username</th><th>Shop</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+              {staff.map((u) => (
+                <tr key={u.id}>
+                  <td><span className={`badge ${u.role === 'merchant' ? 'b-accepted' : 'b-assigned'}`}>{u.role}</span></td>
+                  <td><b>{u.name}</b></td>
+                  <td>{u.username}</td>
+                  <td>{STAFF_SHOPS.find((s) => s.id === u.shop_id)?.name ?? '—'}</td>
+                  <td>
+                    <button className="btn ghost" onClick={() => { setActive(u.id, !u.active).then(load); }}>
+                      {u.active ? 'Active' : 'Disabled'}
+                    </button>
+                  </td>
+                  <td className="row-flex">
+                    <button className="btn ghost" onClick={() => onReset(u.id)}>Reset password</button>
+                    <button className="btn" style={{ background: 'var(--error)' }} onClick={() => { deleteStaff(u.id).then(load); }}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+              {staff.length === 0 && <tr><td colSpan={6} className="muted">No logins yet. Create one above.</td></tr>}
             </tbody>
           </table>
         )}
