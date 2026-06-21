@@ -1,7 +1,11 @@
 /**
- * Global state: auth + location + addresses + cart + last order (Zustand).
+ * Global state: auth + location + addresses + cart + order history (Zustand).
+ * Persisted to the device with AsyncStorage so nothing is lost when the app closes
+ * (cart items, saved addresses, order history, and login all stay saved).
  */
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LatLng } from './algorithms';
 import { Product } from './catalog';
 
@@ -12,10 +16,10 @@ export interface CartLine {
 
 export interface Address {
   id: string;
-  label: string; // Home / Work / Other
+  label: string;
   name: string;
   phone: string;
-  line: string; // house / flat / building / street
+  line: string;
   landmark: string;
   lat: number;
   lng: number;
@@ -30,6 +34,8 @@ export interface LastOrder {
   shop: LatLng;
 }
 
+export interface OrderItemLite { name: string; qty: number; price: number }
+
 export interface PastOrder {
   id: string;
   total: number;
@@ -37,24 +43,22 @@ export interface PastOrder {
   createdAt: number;
   itemCount: number;
   addressLabel: string;
-  status: 'Delivered';
+  status: string;
+  items: OrderItemLite[];
 }
 
 interface AppState {
-  // auth
   loggedIn: boolean;
   phone: string | null;
   name: string | null;
   login: (phone: string, name?: string) => void;
   logout: () => void;
 
-  // current device location / serviceability
   location: LatLng | null;
   serviceable: boolean | null;
   distanceFromCenter: number | null;
   setLocation: (loc: LatLng, serviceable: boolean, distance: number) => void;
 
-  // saved delivery addresses
   addresses: Address[];
   selectedAddressId: string | null;
   addAddress: (a: Omit<Address, 'id'>) => string;
@@ -62,7 +66,6 @@ interface AppState {
   selectAddress: (id: string) => void;
   selectedAddress: () => Address | null;
 
-  // cart
   lines: Record<string, CartLine>;
   add: (p: Product) => void;
   remove: (productId: string) => void;
@@ -70,69 +73,79 @@ interface AppState {
   count: () => number;
   subtotal: () => number;
 
-  // last placed order (for tracking screen)
   lastOrder: LastOrder | null;
   setLastOrder: (o: LastOrder) => void;
 
-  // order history
   orderHistory: PastOrder[];
   addToHistory: (o: PastOrder) => void;
 }
 
-export const useStore = create<AppState>((set, get) => ({
-  loggedIn: false,
-  phone: null,
-  name: null,
-  login: (phone, name) => set({ loggedIn: true, phone, name: name ?? null }),
-  logout: () =>
-    set({ loggedIn: false, phone: null, name: null, lines: {}, addresses: [], selectedAddressId: null }),
+export const useStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      loggedIn: false,
+      phone: null,
+      name: null,
+      login: (phone, name) => set({ loggedIn: true, phone, name: name ?? null }),
+      logout: () => set({ loggedIn: false, phone: null, name: null, lines: {} }),
 
-  location: null,
-  serviceable: null,
-  distanceFromCenter: null,
-  setLocation: (loc, serviceable, distance) =>
-    set({ location: loc, serviceable, distanceFromCenter: distance }),
+      location: null,
+      serviceable: null,
+      distanceFromCenter: null,
+      setLocation: (loc, serviceable, distance) =>
+        set({ location: loc, serviceable, distanceFromCenter: distance }),
 
-  addresses: [],
-  selectedAddressId: null,
-  addAddress: (a) => {
-    const id = 'addr_' + Date.now();
-    set((s) => ({
-      addresses: [...s.addresses, { ...a, id }],
-      selectedAddressId: id,
-    }));
-    return id;
-  },
-  updateAddress: (a) =>
-    set((s) => ({ addresses: s.addresses.map((x) => (x.id === a.id ? a : x)) })),
-  selectAddress: (id) => set({ selectedAddressId: id }),
-  selectedAddress: () => {
-    const s = get();
-    return s.addresses.find((a) => a.id === s.selectedAddressId) ?? null;
-  },
+      addresses: [],
+      selectedAddressId: null,
+      addAddress: (a) => {
+        const id = 'addr_' + Date.now();
+        set((s) => ({ addresses: [...s.addresses, { ...a, id }], selectedAddressId: id }));
+        return id;
+      },
+      updateAddress: (a) => set((s) => ({ addresses: s.addresses.map((x) => (x.id === a.id ? a : x)) })),
+      selectAddress: (id) => set({ selectedAddressId: id }),
+      selectedAddress: () => {
+        const s = get();
+        return s.addresses.find((a) => a.id === s.selectedAddressId) ?? null;
+      },
 
-  lines: {},
-  add: (p) =>
-    set((state) => {
-      const existing = state.lines[p.id];
-      return { lines: { ...state.lines, [p.id]: { product: p, qty: existing ? existing.qty + 1 : 1 } } };
+      lines: {},
+      add: (p) =>
+        set((state) => {
+          const existing = state.lines[p.id];
+          return { lines: { ...state.lines, [p.id]: { product: p, qty: existing ? existing.qty + 1 : 1 } } };
+        }),
+      remove: (productId) =>
+        set((state) => {
+          const existing = state.lines[productId];
+          if (!existing) return state;
+          const next = { ...state.lines };
+          if (existing.qty <= 1) delete next[productId];
+          else next[productId] = { ...existing, qty: existing.qty - 1 };
+          return { lines: next };
+        }),
+      clear: () => set({ lines: {} }),
+      count: () => Object.values(get().lines).reduce((s, l) => s + l.qty, 0),
+      subtotal: () => Object.values(get().lines).reduce((s, l) => s + l.product.price * l.qty, 0),
+
+      lastOrder: null,
+      setLastOrder: (o) => set({ lastOrder: o }),
+
+      orderHistory: [],
+      addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
     }),
-  remove: (productId) =>
-    set((state) => {
-      const existing = state.lines[productId];
-      if (!existing) return state;
-      const next = { ...state.lines };
-      if (existing.qty <= 1) delete next[productId];
-      else next[productId] = { ...existing, qty: existing.qty - 1 };
-      return { lines: next };
-    }),
-  clear: () => set({ lines: {} }),
-  count: () => Object.values(get().lines).reduce((s, l) => s + l.qty, 0),
-  subtotal: () => Object.values(get().lines).reduce((s, l) => s + l.product.price * l.qty, 0),
-
-  lastOrder: null,
-  setLastOrder: (o) => set({ lastOrder: o }),
-
-  orderHistory: [],
-  addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
-}));
+    {
+      name: 'next-customer-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (s) => ({
+        loggedIn: s.loggedIn,
+        phone: s.phone,
+        name: s.name,
+        addresses: s.addresses,
+        selectedAddressId: s.selectedAddressId,
+        lines: s.lines,
+        orderHistory: s.orderHistory,
+      }),
+    },
+  ),
+);

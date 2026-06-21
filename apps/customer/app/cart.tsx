@@ -71,7 +71,8 @@ export default function Cart() {
         createdAt: Date.now(),
         itemCount,
         addressLabel: address.label,
-        status: 'Delivered',
+        status: 'Placed',
+        items: items.map((l) => ({ name: l.product.name, qty: l.qty, price: l.product.price })),
       });
       clear();
       setPlacing(false);

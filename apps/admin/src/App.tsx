@@ -5,6 +5,7 @@ import {
   listProducts, addProduct, deleteProduct, toggleStock, loadStarterCatalog,
 } from './productApi';
 import { DEMO_MODE } from './supabase';
+import { listLiveOrders, LiveOrder } from './orderApi';
 
 type Tab = 'orders' | 'products' | 'shops' | 'riders' | 'payouts';
 
@@ -16,22 +17,35 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'payouts', label: 'Payouts', icon: '💰' },
 ];
 
-function StatusBadge({ status }: { status: AdminOrder['status'] }) {
-  const map: Record<AdminOrder['status'], string> = {
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
     placed: 'b-placed',
     accepted: 'b-accepted',
     ready: 'b-ready',
     assigned: 'b-assigned',
+    picked_up: 'b-assigned',
     delivered: 'b-delivered',
+    cancelled: 'b-placed',
+    pending_payment: 'b-placed',
   };
-  return <span className={`badge ${map[status]}`}>{status}</span>;
+  return <span className={`badge ${map[status] ?? 'b-delivered'}`}>{status}</span>;
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('orders');
+  const [live, setLive] = useState<LiveOrder[] | null>(null);
 
-  const liveCount = orders.filter((o) => o.status !== 'delivered').length;
-  const todayRevenue = orders.reduce((s, o) => s + o.total, 0);
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    const load = () => listLiveOrders().then(setLive);
+    load();
+    const t = setInterval(load, 8000);
+    return () => clearInterval(t);
+  }, []);
+
+  const orderRows: any[] = !DEMO_MODE && live ? live : orders;
+  const liveCount = orderRows.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length;
+  const todayRevenue = orderRows.reduce((s, o) => s + o.total, 0);
   const onlineRiders = riders.filter((r) => r.online).length;
   const pendingPayouts = payouts.filter((p) => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
 
@@ -56,9 +70,15 @@ export default function App() {
       <main className="main">
         <h1 className="page-title">
           {NAV.find((n) => n.id === tab)?.label}
-          <span className="demo-pill">DEMO DATA</span>
+          <span className="demo-pill" style={{ background: DEMO_MODE ? 'var(--warning)' : 'var(--primary)' }}>
+            {DEMO_MODE ? 'DEMO DATA' : 'LIVE'}
+          </span>
         </h1>
-        <p className="page-sub">Live data connects in Stage 8 (Supabase). This shows the full layout.</p>
+        <p className="page-sub">
+          {DEMO_MODE
+            ? 'Add apps/admin/.env to connect live data.'
+            : 'Connected to your live database. Orders & products are real-time.'}
+        </p>
 
         {/* Stats */}
         <div className="stats">
@@ -91,11 +111,11 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => (
-                  <tr key={o.code}>
+                {orderRows.map((o) => (
+                  <tr key={o.id ?? o.code}>
                     <td><b>{o.code}</b></td>
                     <td>{o.customer}</td>
-                    <td>{o.shop}</td>
+                    <td>{o.shop ?? '—'}</td>
                     <td>{o.rider}</td>
                     <td>{o.area}</td>
                     <td>₹{o.total}</td>
@@ -103,6 +123,7 @@ export default function App() {
                     <td className="muted">{o.ago}</td>
                   </tr>
                 ))}
+                {orderRows.length === 0 && <tr><td colSpan={8} className="muted">No orders yet.</td></tr>}
               </tbody>
             </table>
           </div>

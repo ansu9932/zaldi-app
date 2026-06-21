@@ -72,16 +72,25 @@ export default function Profile() {
           orderHistory.map((o) => (
             <View key={o.id} style={styles.orderCard}>
               <View style={styles.orderTop}>
-                <Text style={styles.orderId}>#{o.id}</Text>
+                <Text style={styles.orderId}>#{String(o.id).replace(/-/g, '').slice(0, 6).toUpperCase()}</Text>
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>{o.status}</Text>
                 </View>
               </View>
-              <Text style={styles.orderMeta}>
-                {o.itemCount} item{o.itemCount > 1 ? 's' : ''} · {o.paymentMethod === 'upi' ? 'UPI' : 'COD'} · to {o.addressLabel}
-              </Text>
+              <View style={styles.itemList}>
+                {(o.items ?? []).map((it, i) => (
+                  <Text key={i} style={styles.itemLine} numberOfLines={1}>
+                    <Text style={styles.itemQty}>{it.qty}× </Text>{it.name}
+                  </Text>
+                ))}
+                {(!o.items || o.items.length === 0) && (
+                  <Text style={styles.itemLine}>{o.itemCount} item{o.itemCount > 1 ? 's' : ''}</Text>
+                )}
+              </View>
               <View style={styles.orderBottom}>
-                <Text style={styles.orderTime}>{timeAgo(o.createdAt)}</Text>
+                <Text style={styles.orderTime}>
+                  {timeAgo(o.createdAt)} · {o.paymentMethod === 'upi' ? 'UPI' : 'COD'} · {o.addressLabel}
+                </Text>
                 <Text style={styles.orderTotal}>₹{o.total}</Text>
               </View>
             </View>
@@ -122,6 +131,9 @@ const styles = StyleSheet.create({
   statusBadge: { backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   statusText: { color: colors.primaryDark, fontWeight: '800', fontSize: 11 },
   orderMeta: { color: colors.inkMuted, fontSize: 13, marginTop: 6 },
+  itemList: { marginTop: 10, gap: 3 },
+  itemLine: { color: colors.inkMuted, fontSize: 13 },
+  itemQty: { color: colors.primaryDark, fontWeight: '800' },
   orderBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   orderTime: { color: colors.inkFaint, fontSize: 12 },
   orderTotal: { fontWeight: '900', color: colors.ink, fontSize: 16 },

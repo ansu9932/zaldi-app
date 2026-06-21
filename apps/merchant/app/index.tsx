@@ -19,6 +19,7 @@ export default function MerchantHome() {
   const [online, setOnline] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
     const data = await fetchActiveOrders();
@@ -29,11 +30,15 @@ export default function MerchantHome() {
     load();
     const unsub = subscribeOrders(load);
     const poll = setInterval(load, 8000); // safety refresh
-    return () => { unsub(); clearInterval(poll); };
+    const tick = setInterval(() => setNow(Date.now()), 1000); // countdown
+    return () => { unsub(); clearInterval(poll); clearInterval(tick); };
   }, [load]);
 
   async function accept(id: string) { await setStatus(id, 'accepted'); load(); }
   async function markReady(id: string) { await setStatus(id, 'ready'); load(); }
+  async function cancel(id: string) { await setStatus(id, 'cancelled'); load(); }
+
+  function fmt(sec: number) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
 
   const newOrders = orders.filter((o) => o.status === 'placed');
   const active = orders.filter((o) => ['accepted', 'ready', 'assigned', 'picked_up'].includes(o.status));
@@ -66,22 +71,36 @@ export default function MerchantHome() {
       >
         <Text style={styles.section}>🔔 New orders</Text>
         {newOrders.length === 0 && <Empty text="No new orders right now. Place one from the Customer app!" />}
-        {newOrders.map((o) => (
-          <OrderCard key={o.id} order={o}>
-            <TouchableOpacity style={styles.acceptBtn} onPress={() => accept(o.id)}>
-              <Text style={styles.acceptText}>Accept order</Text>
-            </TouchableOpacity>
-          </OrderCard>
-        ))}
+        {newOrders.map((o) => {
+          const remain = Math.max(0, 120 - Math.floor((now - new Date(o.created_at).getTime()) / 1000));
+          return (
+            <OrderCard key={o.id} order={o}>
+              <Text style={remain > 0 ? styles.timer : styles.timerOver}>
+                {remain > 0 ? `⏱ Please respond within ${fmt(remain)}` : '⏰ Overdue — accept or cancel'}
+              </Text>
+              <TouchableOpacity style={styles.acceptBtn} onPress={() => accept(o.id)}>
+                <Text style={styles.acceptText}>Accept order</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => cancel(o.id)}>
+                <Text style={styles.cancelText}>Cancel order</Text>
+              </TouchableOpacity>
+            </OrderCard>
+          );
+        })}
 
         <Text style={[styles.section, { marginTop: spacing.xl }]}>👨‍🍳 In progress</Text>
         {active.length === 0 && <Empty text="No active orders." />}
         {active.map((o) => (
           <OrderCard key={o.id} order={o}>
             {o.status === 'accepted' && (
-              <TouchableOpacity style={styles.readyBtn} onPress={() => markReady(o.id)}>
-                <Text style={styles.readyText}>Mark items ready</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.readyBtn} onPress={() => markReady(o.id)}>
+                  <Text style={styles.readyText}>Mark items ready</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => cancel(o.id)}>
+                  <Text style={styles.cancelText}>Cancel order</Text>
+                </TouchableOpacity>
+              </>
             )}
             {o.status === 'ready' && <Text style={styles.waitText}>✅ Ready — finding a rider…</Text>}
             {(o.status === 'assigned' || o.status === 'picked_up') && <Text style={styles.waitText}>🛵 Rider handling delivery</Text>}
@@ -162,4 +181,8 @@ const styles = StyleSheet.create({
   readyBtn: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginTop: spacing.md },
   readyText: { color: colors.white, fontWeight: '800', fontSize: 15 },
   waitText: { color: colors.success, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
+  timer: { color: colors.warning, fontWeight: '800', fontSize: 13, marginTop: spacing.md, textAlign: 'center' },
+  timerOver: { color: colors.error, fontWeight: '800', fontSize: 13, marginTop: spacing.md, textAlign: 'center' },
+  cancelBtn: { borderWidth: 1, borderColor: colors.error, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
+  cancelText: { color: colors.error, fontWeight: '800', fontSize: 14 },
 });
