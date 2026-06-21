@@ -6,16 +6,9 @@
 import { supabase, DEMO_MODE } from './supabase';
 import { CartLine, Address } from './store';
 
-// Map local catalog shop ids -> the real shop UUIDs from seed.sql
-const SHOP_UUID: Record<string, string> = {
-  s1: '11111111-1111-1111-1111-111111111111',
-  s2: '22222222-2222-2222-2222-222222222222',
-  s3: '33333333-3333-3333-3333-333333333333',
-};
-
 export interface CreateOrderParams {
   items: CartLine[];
-  shopLocalId: string;
+  shopId: string; // real shop UUID
   name: string;
   phone: string;
   address: Address;
@@ -32,16 +25,14 @@ export interface CreateOrderParams {
 export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; id: string; error?: string }> {
   const localId = 'NX' + Date.now().toString().slice(-6);
   if (DEMO_MODE) {
-    // No backend configured — keep working locally.
     return { ok: true, id: localId };
   }
 
   try {
-    const shopId = SHOP_UUID[p.shopLocalId] ?? SHOP_UUID.s1;
     const { data, error } = await supabase
       .from('orders')
       .insert({
-        shop_id: shopId,
+        shop_id: p.shopId,
         customer_name: p.name,
         customer_phone: p.phone,
         dropoff_address: `${p.address.line}${p.address.landmark ? ', ' + p.address.landmark : ''}`,
@@ -153,26 +144,20 @@ export async function markOrderPaid(orderId: string, paymentId: string): Promise
 }
 
 
-import { PRODUCTS, Product } from './catalog';
+import { Product } from './catalog';
 
-const UUID_TO_LOCAL: Record<string, string> = {
-  '11111111-1111-1111-1111-111111111111': 's1',
-  '22222222-2222-2222-2222-222222222222': 's2',
-  '33333333-3333-3333-3333-333333333333': 's3',
-};
-
-/** Load the product catalog from the database (managed in Admin). Falls back to the built-in catalog. */
+/** Load the product catalog from the database (managed in Admin). Empty until products are added. */
 export async function getCatalogProducts(): Promise<Product[]> {
-  if (DEMO_MODE) return PRODUCTS;
+  if (DEMO_MODE) return [];
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('id, shop_id, name, category, price, unit, image_url, in_stock')
+      .select('id, shop_id, name, category, price, unit, image_url, in_stock, shops(lat,lng)')
       .eq('in_stock', true);
-    if (error || !data || data.length === 0) return PRODUCTS;
+    if (error || !data) return [];
     return data.map((r: any) => ({
       id: r.id,
-      shopId: UUID_TO_LOCAL[r.shop_id] ?? 's1',
+      shopId: r.shop_id,
       name: r.name,
       category: r.category,
       price: Number(r.price),
@@ -180,8 +165,10 @@ export async function getCatalogProducts(): Promise<Product[]> {
       emoji: '🛍️',
       image: r.image_url ?? undefined,
       q: r.name,
+      shopLat: r.shops?.lat ?? null,
+      shopLng: r.shops?.lng ?? null,
     }));
   } catch {
-    return PRODUCTS;
+    return [];
   }
 }

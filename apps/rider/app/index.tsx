@@ -112,7 +112,7 @@ function Dashboard() {
             <Text style={styles.section}>🛵 Active delivery</Text>
             <View style={styles.activeCard}>
               <Text style={styles.code}>{current.code}</Text>
-              <Step active={current.status === 'assigned'} done={current.status === 'picked_up'} title="Pick up from store" sub="Kanthi Fresh Mart, Central Market" onNav={() => openMaps(21.779, 87.752)} />
+              <Step active={current.status === 'assigned'} done={current.status === 'picked_up'} title="Pick up from store" sub={`${current.shopName} · ${current.shopAddress}`} onNav={() => openMaps(current.shopLat, current.shopLng)} />
               <Step active={current.status === 'picked_up'} done={false} title="Deliver to customer" sub={`${current.customer} · ${current.dropAddress}`} onNav={() => openMaps(current.dropLat, current.dropLng)} />
               {current.status === 'assigned' ? (
                 <TouchableOpacity style={styles.primaryBtn} onPress={() => onAdvance(current)}>

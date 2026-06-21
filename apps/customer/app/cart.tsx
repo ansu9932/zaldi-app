@@ -29,8 +29,10 @@ export default function Cart() {
   // distance from shop to the delivery address (falls back to device location)
   const shopLoc = useMemo(() => {
     const first = items[0];
-    const shop = first ? shopById(first.product.shopId) : undefined;
-    return shop?.location ?? SERVICE_CENTER;
+    if (first?.product.shopLat != null && first?.product.shopLng != null) {
+      return { lat: first.product.shopLat, lng: first.product.shopLng };
+    }
+    return SERVICE_CENTER;
   }, [items]);
 
   const shopToCustomerKm = useMemo(() => {
@@ -46,11 +48,11 @@ export default function Cart() {
     if (!address || items.length === 0) return;
     setPlacing(true);
     const itemCount = items.reduce((s, l) => s + l.qty, 0);
-    const shopLocalId = items[0].product.shopId;
+    const shopId = items[0].product.shopId;
 
     createOrder({
       items,
-      shopLocalId,
+      shopId,
       name: name ?? address.name,
       phone: phone ?? address.phone,
       address,

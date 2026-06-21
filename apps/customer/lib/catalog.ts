@@ -24,12 +24,15 @@ export interface Product {
   tag?: string; // e.g. "FAST", "OFFER"
   q?: string; // optional image search keyword
   image?: string; // explicit photo URL (from admin/DB), overrides keyword
+  shopLat?: number;
+  shopLng?: number;
 }
 
 export interface Category {
   id: string;
   label: string;
   emoji: string;
+  highlight?: boolean;
 }
 
 export const CATEGORIES: Category[] = [
@@ -41,6 +44,8 @@ export const CATEGORIES: Category[] = [
   { id: 'beverages', label: 'Beverages', emoji: '🥤' },
   { id: 'medicines', label: 'Pharmacy', emoji: '💊' },
   { id: 'personal', label: 'Personal Care', emoji: '🧴' },
+  { id: 'wine', label: 'Wine Shop', emoji: '🍷', highlight: true },
+  { id: 'cigarettes', label: 'Cigarettes', emoji: '🚬', highlight: true },
 ];
 
 export const SHOPS: Shop[] = [

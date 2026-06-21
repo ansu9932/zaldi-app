@@ -18,6 +18,10 @@ export interface Job {
   status: 'ready' | 'assigned' | 'picked_up';
   paymentMethod: string;
   paymentStatus: string;
+  shopName: string;
+  shopLat: number | null;
+  shopLng: number | null;
+  shopAddress: string;
 }
 
 // simple payout model (matches shared/algorithms)
@@ -39,11 +43,15 @@ function mapRow(r: any): Job {
     status: r.status,
     paymentMethod: r.payment_method ?? 'cod',
     paymentStatus: r.payment_status ?? 'pending',
+    shopName: r.shops?.name ?? 'Store',
+    shopLat: r.shops?.lat ?? null,
+    shopLng: r.shops?.lng ?? null,
+    shopAddress: r.shops?.address ?? '',
   };
 }
 
 export const DEMO_JOBS: Job[] = [
-  { id: 'demoj1', code: '#NX1041', customer: 'Ananya P. (demo)', dropAddress: 'Darua, Contai', dropLat: 21.77, dropLng: 87.745, distanceKm: 1.6, total: 174, items: 4, payout: 28, status: 'ready', paymentMethod: 'cod', paymentStatus: 'cod' },
+  { id: 'demoj1', code: '#NX1041', customer: 'Ananya P. (demo)', dropAddress: 'Darua, Contai', dropLat: 21.77, dropLng: 87.745, distanceKm: 1.6, total: 174, items: 4, payout: 28, status: 'ready', paymentMethod: 'cod', paymentStatus: 'cod', shopName: 'Kanthi Fresh Mart', shopLat: 21.779, shopLng: 87.752, shopAddress: 'Central Market, Contai' },
 ];
 
 export async function fetchJobs(riderId?: string): Promise<Job[]> {
@@ -51,7 +59,7 @@ export async function fetchJobs(riderId?: string): Promise<Job[]> {
   // Offers = ready orders not yet taken by any rider
   const offersQ = supabase
     .from('orders')
-    .select('*, order_items(id)')
+    .select('*, order_items(id), shops(name,lat,lng,address)')
     .eq('status', 'ready')
     .is('rider_id', null)
     .order('created_at', { ascending: true });
@@ -59,7 +67,7 @@ export async function fetchJobs(riderId?: string): Promise<Job[]> {
   const mineQ = riderId
     ? supabase
         .from('orders')
-        .select('*, order_items(id)')
+        .select('*, order_items(id), shops(name,lat,lng,address)')
         .eq('rider_id', riderId)
         .in('status', ['assigned', 'picked_up'])
         .order('created_at', { ascending: true })

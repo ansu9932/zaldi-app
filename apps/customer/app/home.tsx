@@ -147,10 +147,27 @@ export default function Home() {
           </View>
         </View>
 
+        {/* Highlighted (18+) categories */}
+        <Text style={styles.sectionTitle}>🔞 For adults (18+)</Text>
+        <View style={styles.highlightRow}>
+          {CATEGORIES.filter((c) => c.highlight).map((c) => (
+            <Pressable
+              key={c.id}
+              style={({ pressed }) => [styles.highlightCard, { opacity: pressed ? 0.85 : 1 }]}
+              onPress={() => router.push(`/category/${c.id}`)}
+            >
+              <View style={styles.ageBadge}><Text style={styles.ageBadgeText}>18+</Text></View>
+              <Text style={styles.highlightEmoji}>{c.emoji}</Text>
+              <Text style={styles.highlightLabel}>{c.label}</Text>
+              <Text style={styles.highlightSub}>Tap to explore</Text>
+            </Pressable>
+          ))}
+        </View>
+
         {/* Categories */}
         <Text style={styles.sectionTitle}>Shop by category</Text>
         <View style={styles.catGrid}>
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.filter((c) => !c.highlight).map((c) => (
             <Pressable
               key={c.id}
               style={({ pressed }) => [styles.catItem, { opacity: pressed ? 0.6 : 1 }]}
@@ -164,11 +181,17 @@ export default function Home() {
           ))}
         </View>
 
-        {/* Product rows */}
-        <ProductRow title="⚡ Bestsellers" data={bestList} />
-        <ProductRow title="🍎 Fresh Fruits" data={byCat('fruits')} onSeeAll={() => router.push('/category/fruits')} />
-        <ProductRow title="🥬 Vegetables" data={byCat('vegetables')} onSeeAll={() => router.push('/category/vegetables')} />
-        <ProductRow title="🥛 Dairy & Bread" data={byCat('dairy')} onSeeAll={() => router.push('/category/dairy')} />
+        {/* Product rows — only when products exist */}
+        {products.length > 0 ? (
+          <>
+            <ProductRow title="⚡ Bestsellers" data={bestList} />
+            {byCat('fruits').length > 0 && <ProductRow title="🍎 Fresh Fruits" data={byCat('fruits')} onSeeAll={() => router.push('/category/fruits')} />}
+            {byCat('vegetables').length > 0 && <ProductRow title="🥬 Vegetables" data={byCat('vegetables')} onSeeAll={() => router.push('/category/vegetables')} />}
+            {byCat('dairy').length > 0 && <ProductRow title="🥛 Dairy & Bread" data={byCat('dairy')} onSeeAll={() => router.push('/category/dairy')} />}
+          </>
+        ) : (
+          <Text style={styles.noProducts}>Products are being added. Please check back soon! 🛒</Text>
+        )}
       </ScrollView>
 
       {(cartCount > 0 || showActive) && (
@@ -296,6 +319,15 @@ const styles = StyleSheet.create({
   catItem: { width: '25%', alignItems: 'center', paddingVertical: spacing.sm },
   catIcon: { width: 58, height: 58, borderRadius: radius.lg, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   catLabel: { fontSize: 11, fontWeight: '700', color: colors.inkMuted, marginTop: 6, textAlign: 'center' },
+
+  highlightRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  highlightCard: { flex: 1, backgroundColor: colors.ink, borderRadius: radius.xl, padding: spacing.lg, minHeight: 120, justifyContent: 'flex-end', overflow: 'hidden' },
+  ageBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  ageBadgeText: { color: colors.white, fontWeight: '900', fontSize: 10 },
+  highlightEmoji: { fontSize: 38, marginBottom: 6 },
+  highlightLabel: { color: colors.white, fontWeight: '900', fontSize: 16 },
+  highlightSub: { color: colors.primary, fontWeight: '700', fontSize: 11, marginTop: 2 },
+  noProducts: { textAlign: 'center', color: colors.inkMuted, marginTop: spacing.xl, fontSize: 14, paddingHorizontal: spacing.xl },
 
   pCard: { width: 150, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   pTag: { position: 'absolute', top: 8, left: 8, zIndex: 2, backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
