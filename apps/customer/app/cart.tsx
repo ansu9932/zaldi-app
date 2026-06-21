@@ -6,10 +6,11 @@ import { colors, radius, spacing } from '../lib/brand';
 import { computeFees, distanceKm, estimatedDeliveryMin, SERVICE_CENTER } from '../lib/algorithms';
 import { shopById } from '../lib/catalog';
 import { useStore } from '../lib/store';
+import { createOrder } from '../lib/api';
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
-  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory } = useStore();
+  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory, name, phone } = useStore();
   const [placing, setPlacing] = useState(false);
   const items = Object.values(lines);
   const sub = subtotal();
@@ -34,20 +35,27 @@ export default function Cart() {
   function placeOrder(method: 'upi' | 'cod') {
     if (!address || items.length === 0) return;
     setPlacing(true);
-    const orderId = 'NX' + Date.now().toString().slice(-6);
     const itemCount = items.reduce((s, l) => s + l.qty, 0);
-    // DEMO: real Razorpay + Supabase order creation comes in the Go-Live stage.
-    setTimeout(() => {
-      setLastOrder({
-        id: orderId,
-        total: fees.total,
-        eta,
-        paymentMethod: method,
-        address,
-        shop: shopLoc,
-      });
+    const shopLocalId = items[0].product.shopId;
+
+    createOrder({
+      items,
+      shopLocalId,
+      name: name ?? address.name,
+      phone: phone ?? address.phone,
+      address,
+      distanceKm: shopToCustomerKm,
+      subtotal: fees.subtotal,
+      deliveryFee: fees.deliveryFee,
+      rainFee: fees.rainFee,
+      surgeFee: fees.surgeFee,
+      total: fees.total,
+      eta,
+      paymentMethod: method,
+    }).then((res) => {
+      setLastOrder({ id: res.id, total: fees.total, eta, paymentMethod: method, address, shop: shopLoc });
       addToHistory({
-        id: orderId,
+        id: res.id,
         total: fees.total,
         paymentMethod: method,
         createdAt: Date.now(),
@@ -58,7 +66,7 @@ export default function Cart() {
       clear();
       setPlacing(false);
       router.replace('/track');
-    }, 600);
+    });
   }
 
   if (items.length === 0) {
