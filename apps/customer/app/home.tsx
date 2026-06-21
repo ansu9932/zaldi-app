@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,14 @@ import {
   ActivityIndicator,
   Pressable,
   FlatList,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { isServiceable, SERVICE_RADIUS_KM, SERVICE_CENTER } from '../lib/algorithms';
-import { CATEGORIES, Product } from '../lib/catalog';
+import { CATEGORIES, Category, Product } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { ProductImage } from '../lib/ProductImage';
 import { useCatalog } from '../lib/useCatalog';
@@ -26,6 +27,7 @@ export default function Home() {
   const { serviceable, distanceFromCenter, setLocation, count, name, selectedAddress } = useStore();
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [placeName, setPlaceName] = useState<string | null>(null);
   const cartCount = count();
   const addr = selectedAddress();
   const lastOrder = useStore((s) => s.lastOrder);
@@ -50,6 +52,20 @@ export default function Home() {
       const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       const result = isServiceable(point);
       setLocation(point, result.ok, result.distanceKm);
+
+      // Reverse-geocode the real GPS point so the header shows the actual place.
+      try {
+        const geo = await Location.reverseGeocodeAsync({ latitude: point.lat, longitude: point.lng });
+        const g = geo?.[0];
+        if (g) {
+          const primary = g.name || g.street || g.district || '';
+          const secondary = g.subregion || g.city || g.region || '';
+          const label = [primary, secondary].filter(Boolean).join(', ');
+          if (label) setPlaceName(label);
+        }
+      } catch {
+        /* reverse geocoding is best-effort */
+      }
     } catch (e) {
       setError('Could not get your location. Please try again.');
     } finally {
@@ -118,10 +134,10 @@ export default function Home() {
                 <View style={styles.dotGlow} />
                 <View style={styles.dotCore} />
               </View>
-              <Text style={styles.statusText}>{addr ? `DELIVER TO ${addr.label.toUpperCase()}` : 'SERVICEABLE AREA'}</Text>
+              <Text style={styles.statusText}>{addr ? `DELIVER TO ${addr.label.toUpperCase()}` : 'YOUR LOCATION'}</Text>
             </View>
             <Text style={styles.address} numberOfLines={1}>
-              {addr ? `${addr.line}` : 'Contai, 721401'} ▾
+              {addr ? `${addr.line}` : (placeName ?? 'Locating your area…')} ▾
             </Text>
           </Pressable>
           <TouchableOpacity style={styles.avatar} onPress={() => router.push('/profile')}>
@@ -150,37 +166,11 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Highlighted (18+) categories */}
-        <Text style={styles.sectionTitle}>🔞 For adults (18+)</Text>
-        <View style={styles.highlightRow}>
-          {CATEGORIES.filter((c) => c.highlight).map((c) => (
-            <Pressable
-              key={c.id}
-              style={({ pressed }) => [styles.highlightCard, { opacity: pressed ? 0.85 : 1 }]}
-              onPress={() => router.push(`/category/${c.id}`)}
-            >
-              <View style={styles.ageBadge}><Text style={styles.ageBadgeText}>18+</Text></View>
-              <Text style={styles.highlightEmoji}>{c.emoji}</Text>
-              <Text style={styles.highlightLabel}>{c.label}</Text>
-              <Text style={styles.highlightSub}>Tap to explore</Text>
-            </Pressable>
-          ))}
-        </View>
-
         {/* Categories */}
         <Text style={styles.sectionTitle}>Shop by category</Text>
         <View style={styles.catGrid}>
-          {CATEGORIES.filter((c) => !c.highlight).map((c) => (
-            <Pressable
-              key={c.id}
-              style={({ pressed }) => [styles.catItem, { opacity: pressed ? 0.6 : 1 }]}
-              onPress={() => router.push(`/category/${c.id}`)}
-            >
-              <View style={styles.catIcon}>
-                <Text style={{ fontSize: 26 }}>{c.emoji}</Text>
-              </View>
-              <Text style={styles.catLabel}>{c.label}</Text>
-            </Pressable>
+          {CATEGORIES.map((c) => (
+            <CategoryItem key={c.id} c={c} />
           ))}
         </View>
 
@@ -211,6 +201,46 @@ export default function Home() {
         </View>
       )}
     </View>
+  );
+}
+
+function CategoryItem({ c }: { c: Category }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!c.highlight) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] });
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.catItem, { opacity: pressed ? 0.6 : 1 }]}
+      onPress={() => router.push(`/category/${c.id}`)}
+    >
+      <View style={styles.catIconWrap}>
+        {c.highlight && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.catRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
+          />
+        )}
+        <View style={styles.catIcon}>
+          <Text style={{ fontSize: 26 }}>{c.emoji}</Text>
+        </View>
+        {c.highlight && (
+          <View style={styles.ageDot}><Text style={styles.ageDotText}>18+</Text></View>
+        )}
+      </View>
+      <Text style={styles.catLabel}>{c.label}</Text>
+    </Pressable>
   );
 }
 
@@ -331,6 +361,10 @@ const styles = StyleSheet.create({
 
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg - 4, marginTop: spacing.sm },
   catItem: { width: '25%', alignItems: 'center', paddingVertical: spacing.sm },
+  catIconWrap: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center' },
+  catRing: { position: 'absolute', width: 66, height: 66, borderRadius: radius.lg + 5, borderWidth: 2, borderColor: colors.primary },
+  ageDot: { position: 'absolute', top: -3, right: -3, backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: 5, paddingVertical: 1 },
+  ageDotText: { color: colors.white, fontWeight: '900', fontSize: 8 },
   catIcon: { width: 58, height: 58, borderRadius: radius.lg, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   catLabel: { fontSize: 11, fontWeight: '700', color: colors.inkMuted, marginTop: 6, textAlign: 'center' },
 
