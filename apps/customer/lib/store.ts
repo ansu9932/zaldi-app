@@ -1,9 +1,9 @@
 /**
- * Global cart + location state (Zustand).
+ * Global state: auth + location + cart (Zustand).
  */
 import { create } from 'zustand';
 import { LatLng } from './algorithms';
-import { Product } from './demoData';
+import { Product } from './catalog';
 
 export interface CartLine {
   product: Product;
@@ -11,9 +11,16 @@ export interface CartLine {
 }
 
 interface AppState {
+  // auth
+  loggedIn: boolean;
+  phone: string | null;
+  name: string | null;
+  login: (phone: string, name?: string) => void;
+  logout: () => void;
+
   // location / serviceability
   location: LatLng | null;
-  serviceable: boolean | null; // null = not checked yet
+  serviceable: boolean | null;
   distanceFromCenter: number | null;
   setLocation: (loc: LatLng, serviceable: boolean, distance: number) => void;
 
@@ -27,6 +34,12 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set, get) => ({
+  loggedIn: false,
+  phone: null,
+  name: null,
+  login: (phone, name) => set({ loggedIn: true, phone, name: name ?? null }),
+  logout: () => set({ loggedIn: false, phone: null, name: null, lines: {} }),
+
   location: null,
   serviceable: null,
   distanceFromCenter: null,
@@ -38,10 +51,7 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => {
       const existing = state.lines[p.id];
       return {
-        lines: {
-          ...state.lines,
-          [p.id]: { product: p, qty: existing ? existing.qty + 1 : 1 },
-        },
+        lines: { ...state.lines, [p.id]: { product: p, qty: existing ? existing.qty + 1 : 1 } },
       };
     }),
   remove: (productId) =>
@@ -54,11 +64,6 @@ export const useStore = create<AppState>((set, get) => ({
       return { lines: next };
     }),
   clear: () => set({ lines: {} }),
-  count: () =>
-    Object.values(get().lines).reduce((sum, l) => sum + l.qty, 0),
-  subtotal: () =>
-    Object.values(get().lines).reduce(
-      (sum, l) => sum + l.product.price * l.qty,
-      0
-    ),
+  count: () => Object.values(get().lines).reduce((s, l) => s + l.qty, 0),
+  subtotal: () => Object.values(get().lines).reduce((s, l) => s + l.product.price * l.qty, 0),
 }));
