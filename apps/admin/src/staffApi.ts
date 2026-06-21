@@ -9,12 +9,17 @@ export interface Staff {
   name: string;
   username: string;
   password: string;
+  phone?: string | null;
   shop_id: string | null;
   active: boolean;
 }
 
 export async function listStaff(): Promise<Staff[]> {
   if (DEMO_MODE) return [];
+  // Prefer the safe view (no password column) created by secure_setup.sql.
+  const view = await supabase.from('staff_public').select('*').order('role');
+  if (!view.error && view.data) return view.data as Staff[];
+  // Fallback for setups that have not run secure_setup.sql yet.
   const { data, error } = await supabase.from('staff').select('*').order('role');
   if (error || !data) return [];
   return data as Staff[];

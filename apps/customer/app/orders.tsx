@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { router, Stack } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
-import { useStore } from '../lib/store';
+import { useStore, PastOrder } from '../lib/store';
 
 function timeAgo(ts: number): string {
   const mins = Math.floor((Date.now() - ts) / 60000);
@@ -14,6 +14,16 @@ function timeAgo(ts: number): string {
 
 export default function Orders() {
   const orderHistory = useStore((s) => s.orderHistory);
+  const setCart = useStore((s) => s.setCart);
+
+  function reorder(o: PastOrder) {
+    if (!o.reorder || o.reorder.length === 0) {
+      Alert.alert('Cannot reorder', 'This order is too old to reorder automatically. Please add the items again.');
+      return;
+    }
+    setCart(o.reorder);
+    router.push('/cart');
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
@@ -43,6 +53,9 @@ export default function Orders() {
               <Text style={styles.time}>{timeAgo(o.createdAt)} · {o.paymentMethod === 'upi' ? 'UPI' : 'COD'} · {o.addressLabel}</Text>
               <Text style={styles.total}>₹{o.total}</Text>
             </View>
+            <TouchableOpacity style={styles.reorderBtn} onPress={() => reorder(o)}>
+              <Text style={styles.reorderText}>🔁 Reorder</Text>
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -63,4 +76,6 @@ const styles = StyleSheet.create({
   bottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   time: { color: colors.inkFaint, fontSize: 12, flex: 1 },
   total: { fontWeight: '900', color: colors.ink, fontSize: 16 },
+  reorderBtn: { marginTop: spacing.md, backgroundColor: colors.primaryLight, borderRadius: radius.md, paddingVertical: 11, alignItems: 'center' },
+  reorderText: { color: colors.primaryDark, fontWeight: '800', fontSize: 14 },
 });

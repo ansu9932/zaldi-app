@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder } from '../lib/api';
+import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder, fetchTodayStats, setRiderOnline } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
 
@@ -31,10 +31,16 @@ function Dashboard() {
 
   useEffect(() => {
     load();
+    fetchTodayStats(session?.id).then((s) => { setEarnings(s.earnings); setDeliveries(s.deliveries); });
     const unsub = subscribeOrders(load);
     const poll = setInterval(load, 8000);
     return () => { unsub(); clearInterval(poll); };
   }, [load]);
+
+  function toggleOnline(v: boolean) {
+    setOnline(v);
+    setRiderOnline(session?.id, v);
+  }
 
   const current = jobs.find((j) => j.status === 'assigned' || j.status === 'picked_up') ?? null;
   const offers = jobs.filter((j) => j.status === 'ready');
@@ -91,7 +97,7 @@ function Dashboard() {
           </View>
           <View style={styles.onlineBox}>
             <Text style={[styles.onlineText, { color: online ? colors.white : 'rgba(255,255,255,0.65)' }]}>{online ? 'Online' : 'Offline'}</Text>
-            <Switch value={online} onValueChange={setOnline} trackColor={{ true: colors.ink, false: 'rgba(255,255,255,0.35)' }} thumbColor={colors.white} ios_backgroundColor="rgba(255,255,255,0.35)" />
+            <Switch value={online} onValueChange={toggleOnline} trackColor={{ true: colors.ink, false: 'rgba(255,255,255,0.35)' }} thumbColor={colors.white} ios_backgroundColor="rgba(255,255,255,0.35)" />
             <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
               <Text style={styles.logoutText}>Log out</Text>
             </TouchableOpacity>

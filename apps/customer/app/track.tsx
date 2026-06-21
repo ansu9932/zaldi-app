@@ -8,13 +8,14 @@ import {
   Dimensions,
   Linking,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
 import { useStore } from '../lib/store';
 import { DEMO_MODE } from '../lib/supabase';
-import { getOrder, subscribeOrder, OrderStatusRow } from '../lib/api';
+import { getOrder, subscribeOrder, OrderStatusRow, cancelOrder, getOrderRider, rateOrder, RiderInfo } from '../lib/api';
 import { distanceKm } from '../lib/algorithms';
 import { LiveMap } from '../lib/LiveMap';
 
@@ -38,7 +39,10 @@ function statusToStep(status: string): number {
   }
 }
 
-const RIDER = { name: 'Biswajit Das', vehicle: 'WB-30 · Scooter', rating: '4.8', phone: '+919000000000' };
+// Shown only in DEMO mode (no real rider exists). Live mode fetches the real rider.
+const DEMO_RIDER: RiderInfo & { vehicle: string; rating: string } = {
+  name: 'Rahul (demo rider)', vehicle: 'WB-30 · Scooter', rating: '4.8', phone: null,
+};
 
 const { width } = Dimensions.get('window');
 const PANEL_W = width - spacing.lg * 2;
@@ -51,10 +55,15 @@ export default function Track() {
   const { lastOrder } = useStore();
   const setLastOrderStatus = useStore((s) => s.setLastOrderStatus);
   const clearLastOrder = useStore((s) => s.clearLastOrder);
+  const markRated = useStore((s) => s.markRated);
   const [step, setStep] = useState(0);
   const [riderDist, setRiderDist] = useState<number | null>(null);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
   const [cancelled, setCancelled] = useState(false);
+  const [riderInfo, setRiderInfo] = useState<RiderInfo | null>(null);
+  const [rating, setRating] = useState(0);
+  const [ratingDone, setRatingDone] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const t = useRef(new Animated.Value(0)).current;
   const animatedOnce = useRef(false);
 
@@ -74,6 +83,9 @@ export default function Track() {
       setStep(statusToStep(row.status));
       setLastOrderStatus(row.status);
       if (row.status === 'cancelled') setCancelled(true);
+      if ((row.status === 'assigned' || row.status === 'picked_up') && lastOrder) {
+        getOrderRider(lastOrder.id).then((r) => { if (mounted && r) setRiderInfo(r); });
+      }
       if (row.rider_lat != null && row.rider_lng != null && lastOrder) {
         const rider = { lat: row.rider_lat, lng: row.rider_lng };
         setRiderPos(rider);
@@ -90,6 +102,34 @@ export default function Track() {
     const poll = setInterval(() => getOrder(lastOrder.id).then((o) => o && applyRow(o)), 6000);
     return () => { mounted = false; unsub(); clearInterval(poll); };
   }, []);
+
+  function onCancel() {
+    if (!lastOrder?.id) return;
+    Alert.alert('Cancel this order?', 'You can cancel only before the store accepts it. Any online payment will be refunded.', [
+      { text: 'Keep order', style: 'cancel' },
+      {
+        text: 'Cancel order',
+        style: 'destructive',
+        onPress: async () => {
+          setCancelling(true);
+          const res = await cancelOrder(lastOrder.id);
+          setCancelling(false);
+          if (res.ok) { setCancelled(true); setLastOrderStatus('cancelled'); }
+          else Alert.alert('Cannot cancel', 'The store has already accepted this order, so it can no longer be cancelled. Please contact support.');
+        },
+      },
+    ]);
+  }
+
+  async function submitRating(stars: number) {
+    if (!lastOrder?.id) return;
+    setRating(stars);
+    await rateOrder(lastOrder.id, stars);
+    markRated(lastOrder.id);
+    setRatingDone(true);
+  }
+
+  const rider = DEMO_MODE ? DEMO_RIDER : riderInfo;
 
   // animate rider marker once we reach "on the way" (DEMO only; live uses real GPS)
   useEffect(() => {
@@ -117,18 +157,30 @@ export default function Track() {
           </TouchableOpacity>
         </View>
       ) : delivered ? (
-        <View style={[styles.doneWrap, { paddingTop: insets.top + 40 }]}>
+        <ScrollView contentContainerStyle={[styles.doneWrap, { paddingTop: insets.top + 40, paddingBottom: 40 }]}>
           <View style={styles.doneCircle}><Text style={{ fontSize: 60 }}>🎉</Text></View>
           <Text style={styles.doneTitle}>Order delivered!</Text>
-          <Text style={styles.doneSub}>Delivered by {RIDER.name}. Thank you for ordering on next!</Text>
+          <Text style={styles.doneSub}>Delivered by {rider?.name ?? 'your rider'}. Thank you for ordering on next!</Text>
           <View style={styles.doneCard}>
             <Text style={styles.doneRow}>Order total: ₹{lastOrder?.total ?? '--'}</Text>
             <Text style={styles.doneRow}>Paid via: {lastOrder?.paymentMethod === 'upi' ? 'UPI (Razorpay)' : 'Cash on Delivery'}</Text>
           </View>
+
+          <View style={styles.rateCard}>
+            <Text style={styles.rateTitle}>{ratingDone ? 'Thanks for your feedback! 🙏' : 'How was your delivery?'}</Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <TouchableOpacity key={s} disabled={ratingDone} onPress={() => submitRating(s)} hitSlop={6}>
+                  <Text style={styles.star}>{s <= rating ? '⭐' : '☆'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <TouchableOpacity style={styles.homeBtn} onPress={() => router.replace('/home')}>
             <Text style={styles.homeBtnText}>Back to home</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
           <View style={styles.etaCard}>
@@ -150,21 +202,27 @@ export default function Track() {
           <View style={styles.riderCard}>
             <View style={styles.avatar}><Text style={{ fontSize: 26 }}>🧑‍✈️</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.riderName}>{step >= 3 ? RIDER.name : 'Assigning a rider…'}</Text>
+              <Text style={styles.riderName}>{step >= 3 ? (rider?.name ?? 'Your rider') : 'Assigning a rider…'}</Text>
               <Text style={styles.riderMeta}>
                 {step >= 3
                   ? riderDist != null
-                    ? `🛵 ${riderDist.toFixed(1)} km away · ⭐ ${RIDER.rating}`
-                    : `${RIDER.vehicle} · ⭐ ${RIDER.rating}`
+                    ? `🛵 ${riderDist.toFixed(1)} km away`
+                    : 'On the way to pick up your order'
                   : 'We will assign the nearest rider'}
               </Text>
             </View>
-            {step >= 3 && (
-              <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${RIDER.phone}`)}>
+            {step >= 3 && rider?.phone && (
+              <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${rider.phone}`)}>
                 <Text style={styles.callText}>📞 Call</Text>
               </TouchableOpacity>
             )}
           </View>
+
+          {step === 0 && (
+            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={cancelling}>
+              <Text style={styles.cancelText}>{cancelling ? 'Cancelling…' : 'Cancel order'}</Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.timeline}>
             {STEPS.map((s, i) => {
@@ -230,4 +288,10 @@ const styles = StyleSheet.create({
   doneRow: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   homeBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: spacing.xl, width: '100%' },
   homeBtnText: { color: colors.white, fontWeight: '900', fontSize: 16 },
+  rateCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginTop: spacing.lg, width: '100%', alignItems: 'center' },
+  rateTitle: { fontWeight: '800', color: colors.ink, fontSize: 15 },
+  starsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  star: { fontSize: 30 },
+  cancelBtn: { borderWidth: 1.5, borderColor: colors.error, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: spacing.lg },
+  cancelText: { color: colors.error, fontWeight: '800', fontSize: 15 },
 });

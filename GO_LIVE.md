@@ -5,10 +5,18 @@ dashboard; steps marked **[Kiro]** are code I wire up for you.
 
 ---
 
-## Step 1 — Deploy the database  **[You, 2 min]**
+## Step 1 — Deploy the database  **[You, 3 min]**
 1. Open your Supabase project → **SQL Editor** → **New query**.
 2. Paste all of `supabase/schema.sql` → **Run**.
 3. New query → paste all of `supabase/seed.sql` → **Run** (sample Contai shops/products).
+4. New query → paste `supabase/staff.sql` → **Run** (merchant/rider logins).
+5. New query → paste `supabase/live_setup.sql` → **Run** (order flow + realtime).
+6. New query → paste `supabase/live_location.sql` → **Run** (live rider GPS columns).
+7. New query → paste `supabase/features.sql` → **Run** (coupons, tips, ratings, rider phone/online).
+8. **Before public launch:** New query → paste `supabase/secure_setup.sql` → **Run**.
+   This hashes all staff passwords, stops the app key from reading the staff
+   table, and validates order totals server-side. Logins keep working — the apps
+   automatically use the secure login function once this is run.
 ✅ Your tables, security rules, and realtime are now live.
 
 ## Step 2 — Connect the apps to Supabase  **[You, 1 min]**

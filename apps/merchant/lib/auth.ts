@@ -34,6 +34,23 @@ export async function signIn(username: string, password: string): Promise<{ ok: 
     }
     return { ok: false, error: 'Not connected. Use demo / demo, or add the app .env.' };
   }
+
+  // Preferred: secure login RPC (passwords are bcrypt-hashed after secure_setup.sql).
+  const rpc = await supabase.rpc('verify_staff_login', {
+    p_username: username.trim().toLowerCase(),
+    p_password: password,
+    p_role: 'merchant',
+  });
+  if (!rpc.error) {
+    const rows = (rpc.data ?? []) as any[];
+    if (rows.length > 0) {
+      const u = rows[0];
+      return { ok: true, session: { id: u.id, name: u.name, shopId: u.shop_id, role: 'merchant' } };
+    }
+    return { ok: false, error: 'Invalid username or password' };
+  }
+
+  // Fallback for setups that have not run secure_setup.sql yet (plaintext).
   const { data, error } = await supabase
     .from('staff')
     .select('*')

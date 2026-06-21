@@ -61,6 +61,11 @@ export default function Profile() {
           <Text style={styles.chev}>›</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={[styles.linkRow, { marginTop: spacing.md }]} onPress={() => router.push('/favorites')}>
+          <Text style={styles.linkText}>❤️ My favorites</Text>
+          <Text style={styles.chev}>›</Text>
+        </TouchableOpacity>
+
         {/* Order history */}
         <Text style={styles.section}>Order history</Text>
         {orderHistory.length === 0 ? (
