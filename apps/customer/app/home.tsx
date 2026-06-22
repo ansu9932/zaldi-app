@@ -123,7 +123,7 @@ export default function Home() {
           You are about {distanceFromCenter} km from Contai. next delivers only within{' '}
           {SERVICE_RADIUS_KM} km of Contai (Kanthi).
         </Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={checkLocation}>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => checkLocation()}>
           <Text style={styles.retryText}>Check again</Text>
         </TouchableOpacity>
       </View>
@@ -136,7 +136,7 @@ export default function Home() {
         <Text style={styles.bigEmoji}>🔒</Text>
         <Text style={styles.unavailableTitle}>Location needed</Text>
         <Text style={styles.muted}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={checkLocation}>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => checkLocation()}>
           <Text style={styles.retryText}>Allow location</Text>
         </TouchableOpacity>
         <TouchableOpacity
