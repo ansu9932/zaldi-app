@@ -21,7 +21,7 @@
       "package": "in.nextapp.merchant"
     },
     "web": { "bundler": "metro", "output": "single" },
-    "plugins": ["expo-router", "expo-updates", ["expo-notifications", { "color": "#00D16B" }]],
+    "plugins": ["expo-router", "expo-updates"],
     "extra": { "router": { "origin": false } }
   }
 }

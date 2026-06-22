@@ -39,10 +39,6 @@
         {
           "locationWhenInUsePermission": "next needs your location to check delivery availability and deliver your order."
         }
-      ],
-      [
-        "expo-notifications",
-        { "color": "#00D16B" }
       ]
     ],
     "extra": {
