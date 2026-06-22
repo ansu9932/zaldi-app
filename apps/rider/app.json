@@ -3,12 +3,14 @@
     "name": "next Rider",
     "slug": "next-rider",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "nextrider",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "runtimeVersion": { "policy": "appVersion" },
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
@@ -22,6 +24,10 @@
     },
     "android": {
       "package": "in.nextapp.rider",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00D16B"
+      },
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "web": { "bundler": "metro", "output": "single" },
