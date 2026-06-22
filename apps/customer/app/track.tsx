@@ -218,6 +218,14 @@ export default function Track() {
             )}
           </View>
 
+          {step >= 3 && lastOrder?.otp && (
+            <View style={styles.otpCard}>
+              <Text style={styles.otpLabel}>DELIVERY OTP</Text>
+              <Text style={styles.otpValue}>{lastOrder.otp}</Text>
+              <Text style={styles.otpHint}>Share this code with the rider only when you receive your order.</Text>
+            </View>
+          )}
+
           {step === 0 && (
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={cancelling}>
               <Text style={styles.cancelText}>{cancelling ? 'Cancelling…' : 'Cancel order'}</Text>
@@ -294,4 +302,8 @@ const styles = StyleSheet.create({
   star: { fontSize: 30 },
   cancelBtn: { borderWidth: 1.5, borderColor: colors.error, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: spacing.lg },
   cancelText: { color: colors.error, fontWeight: '800', fontSize: 15 },
+  otpCard: { backgroundColor: colors.primaryLight, borderRadius: radius.lg, padding: spacing.lg, alignItems: 'center', marginBottom: spacing.lg },
+  otpLabel: { color: colors.primaryDark, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  otpValue: { color: colors.ink, fontSize: 34, fontWeight: '900', letterSpacing: 8, marginVertical: 2 },
+  otpHint: { color: colors.inkMuted, fontSize: 12, textAlign: 'center' },
 });

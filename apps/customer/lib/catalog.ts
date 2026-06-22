@@ -26,6 +26,8 @@ export interface Product {
   image?: string; // explicit photo URL (from admin/DB), overrides keyword
   shopLat?: number;
   shopLng?: number;
+  shopName?: string;    // resolved store name (works in live mode, not just demo)
+  shopAddress?: string;
 }
 
 export interface Category {
@@ -124,6 +126,12 @@ export const PRODUCTS: Product[] = [
   { id: 'p3', shopId: 's1', name: 'Clinic Plus Shampoo', category: 'personal', price: 85, unit: '175 ml', emoji: '🧴' },
   { id: 'p4', shopId: 's1', name: 'Surf Excel', category: 'personal', price: 120, unit: '1 kg', emoji: '🧺' },
 ];
+
+/** Categories that legally require the buyer to be 18+ (alcohol, tobacco). */
+export const AGE_RESTRICTED_CATEGORIES = ['wine', 'cigarettes'];
+export function isAgeRestricted(category: string): boolean {
+  return AGE_RESTRICTED_CATEGORIES.includes(category);
+}
 
 export function productsByCategory(category: string): Product[] {
   return PRODUCTS.filter((p) => p.category === category);

@@ -3,7 +3,7 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, RefreshCo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Order, fetchActiveOrders, setStatus, subscribeOrders, setMerchantOnline, savePushToken } from '../lib/api';
+import { Order, fetchActiveOrders, fetchPastOrders, setStatus, subscribeOrders, setMerchantOnline, savePushToken } from '../lib/api';
 import { useAuth, Session } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
 import { registerForPush } from '../lib/push';
@@ -28,12 +28,15 @@ function Dashboard({ session }: { session: Session }) {
   const logout = useAuth((s) => s.logout);
   const [online, setOnline] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [past, setPast] = useState<Order[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
     const data = await fetchActiveOrders(session.shopId);
     setOrders(data);
+    setPast(await fetchPastOrders(session.shopId));
   }, [session.shopId]);
 
   useEffect(() => {
@@ -84,6 +87,9 @@ function Dashboard({ session }: { session: Session }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
       >
         <Text style={styles.section}>🔔 New orders</Text>
+        {!online && (
+          <Text style={styles.offlineBanner}>You are OFFLINE. Customers can still order, but switch Online so you don't miss new orders.</Text>
+        )}
         {!session.shopId && (
           <Text style={styles.empty}>No shop is assigned to your account. Ask the admin to assign your shop in the Staff page.</Text>
         )}
@@ -123,6 +129,19 @@ function Dashboard({ session }: { session: Session }) {
             {(o.status === 'assigned' || o.status === 'picked_up') && <Text style={styles.waitText}>🛵 Rider handling delivery</Text>}
           </OrderCard>
         ))}
+
+        <TouchableOpacity style={styles.historyToggle} onPress={() => setShowHistory((v) => !v)}>
+          <Text style={styles.historyToggleText}>{showHistory ? '▲ Hide order history' : `▼ Order history (${past.length})`}</Text>
+        </TouchableOpacity>
+        {showHistory && (
+          past.length === 0 ? <Empty text="No completed orders yet." /> : past.map((o) => (
+            <OrderCard key={o.id} order={o}>
+              <Text style={o.status === 'delivered' ? styles.waitText : styles.historyCancelled}>
+                {o.status === 'delivered' ? '🎉 Delivered' : '❌ Cancelled'}
+              </Text>
+            </OrderCard>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -204,4 +223,8 @@ const styles = StyleSheet.create({
   timerOver: { color: colors.error, fontWeight: '800', fontSize: 13, marginTop: spacing.md, textAlign: 'center' },
   cancelBtn: { borderWidth: 1, borderColor: colors.error, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
   cancelText: { color: colors.error, fontWeight: '800', fontSize: 14 },
+  offlineBanner: { backgroundColor: '#FEF3C7', color: '#92400E', fontWeight: '700', fontSize: 13, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md, overflow: 'hidden' },
+  historyToggle: { marginTop: spacing.xl, marginBottom: spacing.md, alignItems: 'center', paddingVertical: spacing.sm },
+  historyToggleText: { color: colors.inkMuted, fontWeight: '800', fontSize: 14 },
+  historyCancelled: { color: colors.error, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
 });

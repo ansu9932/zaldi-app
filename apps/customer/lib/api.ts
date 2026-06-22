@@ -24,59 +24,97 @@ export interface CreateOrderParams {
   tip?: number;
   couponCode?: string | null;
   pushToken?: string | null;
+  isRaining?: boolean;
 }
 
-export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; id: string; error?: string }> {
+export async function createOrder(p: CreateOrderParams): Promise<{ ok: boolean; id: string; total?: number; otp?: string; eta?: number; error?: string }> {
   const localId = 'NX' + Date.now().toString().slice(-6);
   if (DEMO_MODE) {
     return { ok: true, id: localId };
   }
 
+  // Items as {product_id, qty} — the server re-prices everything from the DB.
+  const itemsPayload = p.items.map((l) => ({ product_id: l.product.id, qty: l.qty }));
+
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .insert({
-        shop_id: p.shopId,
-        customer_name: p.name,
-        customer_phone: p.phone,
-        dropoff_address: `${p.address.line}${p.address.landmark ? ', ' + p.address.landmark : ''}`,
-        dropoff_lat: p.address.lat,
-        dropoff_lng: p.address.lng,
-        distance_km: Number(p.distanceKm.toFixed(2)),
-        subtotal: p.subtotal,
-        delivery_fee: p.deliveryFee,
-        rain_fee: p.rainFee,
-        surge_fee: p.surgeFee,
-        discount: p.discount ?? 0,
-        tip_amount: p.tip ?? 0,
-        coupon_code: p.couponCode ?? null,
-        push_token: p.pushToken ?? null,
-        total: p.total,
-        payment_method: p.paymentMethod,
-        payment_status: p.paymentMethod === 'cod' ? 'cod' : 'pending',
-        status: p.paymentMethod === 'cod' ? 'placed' : 'pending_payment',
-        eta_min: p.eta,
-      })
-      .select('id')
-      .single();
+    // Preferred path: the hardened server-side RPC (secure_setup_v2.sql).
+    // It validates prices, coupon and fees, decrements stock and returns a
+    // delivery OTP. The client can no longer set its own prices/total.
+    const rpc = await supabase.rpc('create_order', {
+      p_shop_id: p.shopId,
+      p_customer_name: p.name,
+      p_customer_phone: p.phone,
+      p_dropoff_address: `${p.address.line}${p.address.landmark ? ', ' + p.address.landmark : ''}`,
+      p_dropoff_lat: p.address.lat,
+      p_dropoff_lng: p.address.lng,
+      p_payment_method: p.paymentMethod,
+      p_items: itemsPayload,
+      p_coupon_code: p.couponCode ?? null,
+      p_tip: p.tip ?? 0,
+      p_is_raining: !!p.isRaining,
+      p_push_token: p.pushToken ?? null,
+    });
 
-    if (error || !data) return { ok: false, id: localId, error: error?.message };
+    if (!rpc.error && rpc.data) {
+      const d: any = rpc.data;
+      notifyOrder(d.id);
+      return { ok: true, id: d.id, total: Number(d.total), otp: d.otp, eta: Number(d.eta) };
+    }
 
-    const items = p.items.map((l) => ({
-      order_id: data.id,
-      name: l.product.name,
-      price: l.product.price,
-      qty: l.qty,
-    }));
-    await supabase.from('order_items').insert(items);
+    // If the RPC isn't installed yet (older DB), fall back to the legacy insert
+    // so the app keeps working — run secure_setup_v2.sql to enable the secure path.
+    const missingFn = rpc.error && /create_order|function|does not exist|PGRST202|42883/i.test(rpc.error.message ?? '');
+    if (rpc.error && !missingFn) {
+      return { ok: false, id: localId, error: rpc.error.message };
+    }
 
-    // Fire a push to the merchant ("New order") — best-effort, never blocks.
-    notifyOrder(data.id);
-
-    return { ok: true, id: data.id };
+    return await legacyCreateOrder(p, localId);
   } catch (e: any) {
     return { ok: false, id: localId, error: String(e?.message ?? e) };
   }
+}
+
+/** Legacy direct-insert path (used only until secure_setup_v2.sql is applied). */
+async function legacyCreateOrder(p: CreateOrderParams, localId: string): Promise<{ ok: boolean; id: string; total?: number; error?: string }> {
+  const { data, error } = await supabase
+    .from('orders')
+    .insert({
+      shop_id: p.shopId,
+      customer_name: p.name,
+      customer_phone: p.phone,
+      dropoff_address: `${p.address.line}${p.address.landmark ? ', ' + p.address.landmark : ''}`,
+      dropoff_lat: p.address.lat,
+      dropoff_lng: p.address.lng,
+      distance_km: Number(p.distanceKm.toFixed(2)),
+      subtotal: p.subtotal,
+      delivery_fee: p.deliveryFee,
+      rain_fee: p.rainFee,
+      surge_fee: p.surgeFee,
+      discount: p.discount ?? 0,
+      tip_amount: p.tip ?? 0,
+      coupon_code: p.couponCode ?? null,
+      push_token: p.pushToken ?? null,
+      total: p.total,
+      payment_method: p.paymentMethod,
+      payment_status: p.paymentMethod === 'cod' ? 'cod' : 'pending',
+      status: p.paymentMethod === 'cod' ? 'placed' : 'pending_payment',
+      eta_min: p.eta,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) return { ok: false, id: localId, error: error?.message };
+
+  const items = p.items.map((l) => ({
+    order_id: data.id,
+    product_id: l.product.id,
+    name: l.product.name,
+    price: l.product.price,
+    qty: l.qty,
+  }));
+  await supabase.from('order_items').insert(items);
+  notifyOrder(data.id);
+  return { ok: true, id: data.id, total: p.total };
 }
 
 
@@ -224,13 +262,13 @@ export async function getCatalogProducts(): Promise<Product[]> {
     // Enrich demo products with their shop coordinates so distance/ETA work.
     return PRODUCTS.map((p) => {
       const shop = shopById(p.shopId);
-      return { ...p, shopLat: shop?.location.lat, shopLng: shop?.location.lng };
+      return { ...p, shopLat: shop?.location.lat, shopLng: shop?.location.lng, shopName: shop?.name, shopAddress: shop?.address };
     });
   }
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('id, shop_id, name, category, price, unit, image_url, in_stock, shops(lat,lng)')
+      .select('id, shop_id, name, category, price, unit, image_url, in_stock, shops(name,address,lat,lng)')
       .eq('in_stock', true);
     if (error || !data) return [];
     return data.map((r: any) => ({
@@ -245,8 +283,28 @@ export async function getCatalogProducts(): Promise<Product[]> {
       q: r.name,
       shopLat: r.shops?.lat ?? null,
       shopLng: r.shops?.lng ?? null,
+      shopName: r.shops?.name ?? undefined,
+      shopAddress: r.shops?.address ?? undefined,
     }));
   } catch {
     return [];
+  }
+}
+
+export interface ShopRating { avg: number; count: number }
+
+/** Average store rating (from delivered-order ratings). Returns null when none yet. */
+export async function getShopRating(shopId: string): Promise<ShopRating | null> {
+  if (DEMO_MODE || !shopId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('shop_ratings')
+      .select('avg_rating, rating_count')
+      .eq('shop_id', shopId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return { avg: Number(data.avg_rating), count: Number(data.rating_count) };
+  } catch {
+    return null;
   }
 }
