@@ -83,6 +83,15 @@ export default function Home() {
         <TouchableOpacity style={styles.retryBtn} onPress={checkLocation}>
           <Text style={styles.retryText}>Check again</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.manualBtn}
+          onPress={() => setLocation(SERVICE_CENTER, true, 0)}
+        >
+          <Text style={styles.manualText}>I'm in Contai — continue anyway</Text>
+        </TouchableOpacity>
+        <Text style={styles.manualHint}>
+          Your GPS may be slightly off. We'll confirm your exact delivery address at checkout.
+        </Text>
       </View>
     );
   }
