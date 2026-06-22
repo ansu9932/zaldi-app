@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import {
   DBProduct, CATEGORY_OPTIONS, CSV_TEMPLATE,
   listProducts, addProduct, bulkAddProducts, deleteProduct, toggleStock,
@@ -7,8 +7,9 @@ import { DBShop, listShops, addShop, deleteShop } from './shopApi';
 import { DEMO_MODE } from './supabase';
 import { listLiveOrders, LiveOrder } from './orderApi';
 import { Staff, listStaff, addStaff, resetPassword, setActive, deleteStaff } from './staffApi';
+import { Coupon, listCoupons, addCoupon, setCouponActive, deleteCoupon } from './couponApi';
 
-type Tab = 'orders' | 'products' | 'staff' | 'shops' | 'riders' | 'payouts';
+type Tab = 'orders' | 'products' | 'staff' | 'shops' | 'riders' | 'coupons' | 'payouts';
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'orders', label: 'Live Orders', icon: '📦' },
@@ -16,10 +17,13 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'staff', label: 'Staff Logins', icon: '🔑' },
   { id: 'shops', label: 'Shops', icon: '🏪' },
   { id: 'riders', label: 'Riders', icon: '🛵' },
+  { id: 'coupons', label: 'Coupons', icon: '🎟️' },
   { id: 'payouts', label: 'Payouts', icon: '💰' },
 ];
 
 const CONTAI = { lat: 21.7781, lng: 87.7517 };
+
+const ADMIN_PASSCODE = (import.meta.env.VITE_ADMIN_PASSCODE as string) ?? '';
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -37,6 +41,44 @@ function useShops(): DBShop[] {
 }
 
 export default function App() {
+  const [unlocked, setUnlocked] = useState(
+    () => !ADMIN_PASSCODE || sessionStorage.getItem('nx_admin_ok') === '1',
+  );
+  if (!unlocked) {
+    return <Gate onUnlock={() => { sessionStorage.setItem('nx_admin_ok', '1'); setUnlocked(true); }} />;
+  }
+  return <Dashboard />;
+}
+
+function Gate({ onUnlock }: { onUnlock: () => void }) {
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState('');
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (pass === ADMIN_PASSCODE) onUnlock();
+    else setErr('Wrong passcode. Try again.');
+  }
+  return (
+    <div className="gate">
+      <form className="gate-card" onSubmit={submit}>
+        <div className="brand">next<span className="dot">.</span></div>
+        <div className="brand-sub" style={{ marginBottom: 18 }}>Admin · Contai</div>
+        <input
+          className="inp"
+          type="password"
+          placeholder="Enter admin passcode"
+          value={pass}
+          onChange={(e) => { setPass(e.target.value); setErr(''); }}
+          autoFocus
+        />
+        {err && <p style={{ color: 'var(--error)', fontSize: 13, marginTop: 8 }}>{err}</p>}
+        <button className="btn" type="submit" style={{ marginTop: 12, width: '100%' }}>Unlock dashboard</button>
+      </form>
+    </div>
+  );
+}
+
+function Dashboard() {
   const [tab, setTab] = useState<Tab>('orders');
   const [live, setLive] = useState<LiveOrder[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -81,6 +123,11 @@ export default function App() {
         <p className="page-sub">
           {DEMO_MODE ? 'Add apps/admin/.env to connect your database.' : 'Connected to your live database.'}
         </p>
+        {!DEMO_MODE && !ADMIN_PASSCODE && (
+          <p className="page-sub" style={{ color: 'var(--error)', fontWeight: 700 }}>
+            ⚠️ No admin passcode set. Add VITE_ADMIN_PASSCODE to apps/admin/.env to protect this dashboard.
+          </p>
+        )}
 
         <div className="stats">
           <div className="stat-card"><div className="stat-label">Live orders</div><div className="stat-value indigo">{liveCount}</div></div>
@@ -115,6 +162,7 @@ export default function App() {
         {tab === 'products' && <ProductsManager />}
         {tab === 'staff' && <StaffManager />}
         {tab === 'shops' && <ShopsManager />}
+        {tab === 'coupons' && <CouponsManager />}
 
         {tab === 'riders' && (
           <div className="card">
@@ -418,6 +466,90 @@ function StaffManager() {
                 </tr>
               ))}
               {staff.length === 0 && <tr><td colSpan={6} className="muted">No logins yet. Create one above.</td></tr>}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
+  );
+}
+
+
+function CouponsManager() {
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState('');
+  const [code, setCode] = useState('');
+  const [type, setType] = useState<Coupon['type']>('flat');
+  const [value, setValue] = useState('');
+  const [minSubtotal, setMinSubtotal] = useState('');
+  const [maxDiscount, setMaxDiscount] = useState('');
+  const [label, setLabel] = useState('');
+
+  async function load() { setLoading(true); setCoupons(await listCoupons()); setLoading(false); }
+  useEffect(() => { load(); }, []);
+
+  async function onAdd() {
+    if (!code) { setMsg('A coupon code is required.'); return; }
+    if (type !== 'freeship' && !value) { setMsg('Enter a discount value.'); return; }
+    const res = await addCoupon({
+      code,
+      type,
+      value: Number(value) || 0,
+      min_subtotal: Number(minSubtotal) || 0,
+      max_discount: maxDiscount ? Number(maxDiscount) : null,
+      label: label || code,
+      active: true,
+    });
+    if (res.ok) { setMsg('Saved ✅'); setCode(''); setValue(''); setMinSubtotal(''); setMaxDiscount(''); setLabel(''); load(); }
+    else setMsg('Error: ' + res.error);
+  }
+
+  if (DEMO_MODE) {
+    return <div className="card"><h3>Coupons</h3><p className="muted">Connect the dashboard first (create <b>apps/admin/.env</b>), then reload.</p></div>;
+  }
+
+  return (
+    <>
+      <div className="card">
+        <h3>Create / update a coupon</h3>
+        <p className="muted">Flat = ₹ off · Percent = % off (with optional max cap) · Free delivery = waives the delivery fee. Reusing a code updates it.</p>
+        <div className="form-grid">
+          <input className="inp" placeholder="CODE (e.g. NEXT50)" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+          <select className="inp" value={type} onChange={(e) => setType(e.target.value as Coupon['type'])}>
+            <option value="flat">Flat ₹ off</option>
+            <option value="percent">Percent % off</option>
+            <option value="freeship">Free delivery</option>
+          </select>
+          <input className="inp" placeholder={type === 'percent' ? 'Percent (e.g. 10)' : 'Value ₹'} type="number" value={value} onChange={(e) => setValue(e.target.value)} disabled={type === 'freeship'} />
+          <input className="inp" placeholder="Min cart subtotal ₹" type="number" value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} />
+          {type === 'percent' && <input className="inp" placeholder="Max discount ₹ (cap)" type="number" value={maxDiscount} onChange={(e) => setMaxDiscount(e.target.value)} />}
+          <input className="inp" placeholder="Label shown to customer" value={label} onChange={(e) => setLabel(e.target.value)} />
+        </div>
+        <div className="row-flex" style={{ marginTop: 12 }}>
+          <button className="btn" onClick={onAdd}>Save coupon</button>
+          {msg && <span className="muted" style={{ alignSelf: 'center' }}>{msg}</span>}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>All coupons ({coupons.length})</h3>
+        {loading ? <p className="muted">Loading…</p> : (
+          <table>
+            <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min cart</th><th>Cap</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+              {coupons.map((c) => (
+                <tr key={c.code}>
+                  <td><b>{c.code}</b></td>
+                  <td>{c.type}</td>
+                  <td>{c.type === 'percent' ? `${c.value}%` : c.type === 'freeship' ? '—' : `₹${c.value}`}</td>
+                  <td>₹{c.min_subtotal}</td>
+                  <td>{c.max_discount ? `₹${c.max_discount}` : '—'}</td>
+                  <td><button className="btn ghost" onClick={() => { setCouponActive(c.code, !c.active).then(load); }}>{c.active ? 'Active' : 'Off'}</button></td>
+                  <td><button className="btn" style={{ background: 'var(--error)' }} onClick={() => { deleteCoupon(c.code).then(load); }}>Delete</button></td>
+                </tr>
+              ))}
+              {coupons.length === 0 && <tr><td colSpan={7} className="muted">No coupons yet. Create one above.</td></tr>}
             </tbody>
           </table>
         )}

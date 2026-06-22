@@ -46,6 +46,21 @@ export async function fetchActiveOrders(shopId?: string | null): Promise<Order[]
   return data.map(mapRow);
 }
 
+/** Recent completed/cancelled orders for this shop (for the History section). */
+export async function fetchPastOrders(shopId?: string | null, limit = 20): Promise<Order[]> {
+  if (DEMO_MODE) return [];
+  if (!shopId) return [];
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, order_items(name, qty, price)')
+    .eq('shop_id', shopId)
+    .in('status', ['delivered', 'cancelled'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map(mapRow);
+}
+
 export async function setStatus(id: string, status: Order['status']): Promise<void> {
   if (DEMO_MODE) return;
   await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id);

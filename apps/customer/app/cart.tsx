@@ -14,7 +14,7 @@ const TIP_OPTIONS = [0, 10, 20, 30];
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
-  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory, name, phone, pushToken } = useStore();
+  const { lines, add, remove, subtotal, location, clear, selectedAddress, setLastOrder, addToHistory, name, phone, pushToken, setPendingCheckout } = useStore();
   const [placing, setPlacing] = useState(false);
   const [raining, setRaining] = useState(false);
   const [tip, setTip] = useState(0);
@@ -112,6 +112,7 @@ export default function Cart() {
       tip,
       couponCode: coupon?.code ?? null,
       pushToken,
+      isRaining: raining,
       total: finalTotal,
       eta,
       paymentMethod: method,
@@ -121,14 +122,16 @@ export default function Cart() {
         Alert.alert(
           'Could not place order',
           (res.error ?? 'Unknown error') +
-            '\n\nTip: make sure live_setup.sql was run in Supabase and the app .env has your keys.',
+            '\n\nTip: make sure live_setup.sql + secure_setup_v2.sql were run in Supabase and the app .env has your keys.',
         );
         return;
       }
-      setLastOrder({ id: res.id, total: finalTotal, eta, paymentMethod: method, address, shop: shopLoc, discount, tip, couponCode: coupon?.code ?? null });
-      addToHistory({
+      // The server is the source of truth for the amount (it re-prices the cart).
+      const serverTotal = res.total ?? finalTotal;
+      const last = { id: res.id, total: serverTotal, eta: res.eta ?? eta, paymentMethod: method, address, shop: shopLoc, discount, tip, couponCode: coupon?.code ?? null, otp: res.otp ?? null };
+      const history = {
         id: res.id,
-        total: finalTotal,
+        total: serverTotal,
         paymentMethod: method,
         createdAt: Date.now(),
         itemCount,
@@ -138,12 +141,19 @@ export default function Cart() {
         tip,
         items: items.map((l) => ({ name: l.product.name, qty: l.qty, price: l.product.price, productId: l.product.id })),
         reorder: items.map((l) => ({ product: l.product, qty: l.qty })),
-      });
-      clear();
+      };
+
       setPlacing(false);
+
       if (method === 'upi' && !DEMO_MODE) {
-        router.replace(`/pay?orderId=${encodeURIComponent(res.id)}&amount=${finalTotal}`);
+        // Defer: only commit (clear cart + add history + set active order) AFTER
+        // the payment succeeds, so abandoning the payment screen leaves no ghost order.
+        setPendingCheckout({ last, history });
+        router.replace(`/pay?orderId=${encodeURIComponent(res.id)}&amount=${serverTotal}`);
       } else {
+        setLastOrder(last);
+        addToHistory(history);
+        clear();
         router.replace('/track');
       }
     });

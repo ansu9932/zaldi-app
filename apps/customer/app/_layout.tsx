@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="search" options={{ headerShown: false }} />
         <Stack.Screen name="favorites" options={{ title: 'My Favorites' }} />
         <Stack.Screen name="cart" options={{ title: 'Your Cart' }} />
+        <Stack.Screen name="support" options={{ title: 'Help & Support' }} />
       </Stack>
     </SafeAreaProvider>
   );

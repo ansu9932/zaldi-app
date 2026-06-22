@@ -35,6 +35,7 @@ export interface LastOrder {
   discount?: number;
   tip?: number;
   couponCode?: string | null;
+  otp?: string | null;
 }
 
 export interface OrderItemLite { name: string; qty: number; price: number; productId?: string }
@@ -61,6 +62,10 @@ interface AppState {
   name: string | null;
   login: (phone: string, name?: string) => void;
   logout: () => void;
+
+  // Age verification (for 18+ categories: wine / cigarettes)
+  ageVerified: boolean;
+  confirmAge: () => void;
 
   location: LatLng | null;
   serviceable: boolean | null;
@@ -97,6 +102,13 @@ interface AppState {
   addToHistory: (o: PastOrder) => void;
   markRated: (id: string) => void;
 
+  // Deferred checkout: for online (UPI) orders we DON'T clear the cart or write
+  // history until payment actually succeeds. This avoids "ghost orders" where a
+  // customer abandons the payment screen but the app already showed it as placed.
+  pendingCheckout: { last: LastOrder; history: PastOrder } | null;
+  setPendingCheckout: (p: { last: LastOrder; history: PastOrder } | null) => void;
+  commitPendingCheckout: () => void;
+
   pushToken: string | null;
   setPushToken: (t: string | null) => void;
 }
@@ -109,6 +121,9 @@ export const useStore = create<AppState>()(
       name: null,
       login: (phone, name) => set({ loggedIn: true, phone, name: name ?? null }),
       logout: () => set({ loggedIn: false, phone: null, name: null, lines: {} }),
+
+      ageVerified: false,
+      confirmAge: () => set({ ageVerified: true }),
 
       location: null,
       serviceable: null,
@@ -177,6 +192,21 @@ export const useStore = create<AppState>()(
       addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
       markRated: (id) => set((s) => ({ orderHistory: s.orderHistory.map((o) => (o.id === id ? { ...o, rated: true } : o)) })),
 
+      pendingCheckout: null,
+      setPendingCheckout: (p) => set({ pendingCheckout: p }),
+      commitPendingCheckout: () =>
+        set((s) => {
+          const p = s.pendingCheckout;
+          if (!p) return s;
+          return {
+            orderHistory: [p.history, ...s.orderHistory],
+            lastOrder: p.last,
+            lastOrderStatus: 'placed',
+            lines: {},
+            pendingCheckout: null,
+          };
+        }),
+
       pushToken: null,
       setPushToken: (t) => set({ pushToken: t }),
     }),
@@ -187,6 +217,7 @@ export const useStore = create<AppState>()(
         loggedIn: s.loggedIn,
         phone: s.phone,
         name: s.name,
+        ageVerified: s.ageVerified,
         addresses: s.addresses,
         selectedAddressId: s.selectedAddressId,
         lines: s.lines,

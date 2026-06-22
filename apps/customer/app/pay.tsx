@@ -10,7 +10,7 @@ const KEY_ID = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID ?? '';
 
 export default function Pay() {
   const { orderId, amount } = useLocalSearchParams<{ orderId: string; amount: string }>();
-  const { name, phone } = useStore();
+  const { name, phone, commitPendingCheckout } = useStore();
   const [html, setHtml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const amt = Number(amount ?? 0);
@@ -36,9 +36,12 @@ export default function Pay() {
       const msg = JSON.parse(raw);
       if (msg.status === 'success') {
         await markOrderPaid(String(orderId), msg.resp?.razorpay_payment_id ?? '');
+        // Payment confirmed → now it's safe to clear the cart, save history and
+        // open the live tracker for this order.
+        commitPendingCheckout();
         router.replace('/track');
       } else if (msg.status === 'dismiss' || msg.status === 'error') {
-        Alert.alert('Payment cancelled', 'Your order was not paid. You can try again.', [
+        Alert.alert('Payment cancelled', 'Your order was not paid. Your cart is saved — you can try again.', [
           { text: 'OK', onPress: () => router.back() },
         ]);
       }

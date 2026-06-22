@@ -109,13 +109,26 @@ export async function updateRiderLocation(orderId: string, lat: number, lng: num
   await supabase.from('orders').update({ rider_lat: lat, rider_lng: lng }).eq('id', orderId);
 }
 
-/** Mark an order delivered. If paidOnline, also record UPI payment. */
-export async function deliverOrder(id: string, paidOnline: boolean): Promise<void> {
-  if (DEMO_MODE) return;
+/** Mark an order delivered. If paidOnline, also record UPI payment.
+ *  When otp is provided, it must match the customer's delivery OTP — this is the
+ *  proof-of-delivery handover check (same idea Blinkit/Zepto use). */
+export async function deliverOrder(id: string, paidOnline: boolean, otp?: string): Promise<{ ok: boolean; error?: string }> {
+  if (DEMO_MODE) return { ok: true };
+  if (otp != null) {
+    const { data, error } = await supabase.from('orders').select('delivery_otp').eq('id', id).maybeSingle();
+    if (error) return { ok: false, error: 'Could not verify OTP. Check your connection.' };
+    const expected = data?.delivery_otp;
+    // If the order predates OTPs (no code stored), allow delivery to proceed.
+    if (expected && String(expected) !== String(otp).trim()) {
+      return { ok: false, error: 'Incorrect OTP. Ask the customer for the 4-digit code on their tracking screen.' };
+    }
+  }
   const patch: any = { status: 'delivered', updated_at: new Date().toISOString() };
   if (paidOnline) { patch.payment_status = 'paid'; patch.payment_method = 'upi'; }
-  await supabase.from('orders').update(patch).eq('id', id);
+  const { error } = await supabase.from('orders').update(patch).eq('id', id);
+  if (error) return { ok: false, error: error.message };
   notifyOrder(id); // tell the customer "Delivered"
+  return { ok: true };
 }
 
 /** Save this rider's Expo push token so they get "new job" alerts. */

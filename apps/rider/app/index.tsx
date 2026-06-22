@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image, Alert } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image, Alert, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
@@ -27,6 +27,10 @@ function Dashboard() {
   const [deliveries, setDeliveries] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [otpModal, setOtpModal] = useState<{ open: boolean; paidOnline: boolean }>({ open: false, paidOnline: false });
+  const [otpInput, setOtpInput] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const load = useCallback(async () => setJobs(await fetchJobs(session?.id)), [session?.id]);
 
@@ -78,10 +82,33 @@ function Dashboard() {
     load();
   }
   async function finishDelivery(j: Job, paidOnline: boolean) {
-    await deliverOrder(j.id, paidOnline);
-    setEarnings((e) => e + j.payout);
-    setDeliveries((d) => d + 1);
+    // In demo there's no real OTP — complete immediately. In live mode, require
+    // the customer's 4-digit delivery OTP as proof of handover.
+    if (DEMO_MODE) {
+      await deliverOrder(j.id, paidOnline);
+      setEarnings((e) => e + j.payout);
+      setDeliveries((d) => d + 1);
+      setShowQR(false);
+      load();
+      return;
+    }
     setShowQR(false);
+    setOtpInput('');
+    setOtpError(null);
+    setOtpModal({ open: true, paidOnline });
+  }
+
+  async function confirmOtp() {
+    if (!current) return;
+    if (otpInput.trim().length < 4) { setOtpError('Enter the 4-digit code.'); return; }
+    setVerifying(true);
+    const res = await deliverOrder(current.id, otpModal.paidOnline, otpInput.trim());
+    setVerifying(false);
+    if (!res.ok) { setOtpError(res.error ?? 'Could not mark delivered.'); return; }
+    setEarnings((e) => e + current.payout);
+    setDeliveries((d) => d + 1);
+    setOtpModal({ open: false, paidOnline: false });
+    setOtpInput('');
     load();
   }
 
@@ -204,6 +231,33 @@ function Dashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Delivery OTP confirmation modal */}
+      <Modal visible={otpModal.open} transparent animationType="slide" onRequestClose={() => setOtpModal({ open: false, paidOnline: false })}>
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Confirm delivery</Text>
+            <Text style={styles.modalSub}>Ask {current?.customer ?? 'the customer'} for the 4-digit OTP shown on their tracking screen.</Text>
+            <TextInput
+              style={styles.otpInput}
+              value={otpInput}
+              onChangeText={(t) => { setOtpInput(t.replace(/[^0-9]/g, '').slice(0, 4)); setOtpError(null); }}
+              keyboardType="number-pad"
+              maxLength={4}
+              placeholder="––––"
+              placeholderTextColor={colors.inkFaint}
+              textAlign="center"
+            />
+            {otpError && <Text style={styles.otpErr}>{otpError}</Text>}
+            <TouchableOpacity style={styles.paidBtn} onPress={confirmOtp} disabled={verifying}>
+              <Text style={styles.paidBtnText}>{verifying ? 'Verifying…' : '✅ Verify & mark delivered'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setOtpModal({ open: false, paidOnline: false })}>
+              <Text style={styles.closeText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -279,4 +333,6 @@ const styles = StyleSheet.create({
   paidBtnText: { color: colors.white, fontWeight: '900', fontSize: 15 },
   closeBtn: { paddingVertical: 14, marginTop: 4 },
   closeText: { color: colors.inkMuted, fontWeight: '700' },
+  otpInput: { fontSize: 36, fontWeight: '900', letterSpacing: 16, color: colors.ink, borderWidth: 2, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 12, width: '100%', marginTop: spacing.lg },
+  otpErr: { color: colors.error, fontWeight: '700', fontSize: 13, marginTop: spacing.sm, textAlign: 'center' },
 });

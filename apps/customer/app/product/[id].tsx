@@ -1,13 +1,14 @@
 import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../../lib/brand';
-import { CATEGORIES } from '../../lib/catalog';
-import { shopById } from '../../lib/catalog';
+import { CATEGORIES, isAgeRestricted } from '../../lib/catalog';
 import { useStore } from '../../lib/store';
 import { ProductImage } from '../../lib/ProductImage';
 import { useCatalog } from '../../lib/useCatalog';
 import { useGuardedAdd } from '../../lib/useGuardedAdd';
+import { getShopRating, ShopRating } from '../../lib/api';
 
 const { width } = Dimensions.get('window');
 
@@ -20,6 +21,11 @@ export default function ProductDetail() {
 
   const product = products.find((p) => p.id === id);
   const cartCount = count();
+
+  const [rating, setRating] = useState<ShopRating | null>(null);
+  useEffect(() => {
+    if (product?.shopId) getShopRating(product.shopId).then(setRating);
+  }, [product?.shopId]);
 
   if (!product) {
     return (
@@ -37,7 +43,9 @@ export default function ProductDetail() {
   const qty = lines[product.id]?.qty ?? 0;
   const fav = isFavorite(product.id);
   const catName = CATEGORIES.find((c) => c.id === product.category)?.label ?? product.category;
-  const shop = shopById(product.shopId);
+  const shopName = product.shopName;
+  const shopAddress = product.shopAddress;
+  const restricted = isAgeRestricted(product.category);
   const saving = product.mrp && product.mrp > product.price ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0;
   const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 6);
 
@@ -64,10 +72,19 @@ export default function ProductDetail() {
             {saving > 0 && <View style={styles.savePill}><Text style={styles.saveText}>{saving}% OFF</Text></View>}
           </View>
 
-          {shop && (
+          {restricted && (
+            <View style={styles.ageCard}>
+              <Text style={styles.ageText}>🔞 Age-restricted item · sold only to 18+ · ID required at delivery</Text>
+            </View>
+          )}
+
+          {shopName && (
             <View style={styles.shopCard}>
-              <Text style={styles.shopTitle}>🏪 Sold by {shop.name}</Text>
-              <Text style={styles.shopSub}>{shop.address}</Text>
+              <Text style={styles.shopTitle}>🏪 Sold by {shopName}</Text>
+              {!!shopAddress && <Text style={styles.shopSub}>{shopAddress}</Text>}
+              {rating && rating.count > 0 && (
+                <Text style={styles.ratingText}>⭐ {rating.avg} · {rating.count} rating{rating.count > 1 ? 's' : ''}</Text>
+              )}
             </View>
           )}
 
@@ -140,6 +157,9 @@ const styles = StyleSheet.create({
   shopCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border },
   shopTitle: { fontWeight: '800', color: colors.ink, fontSize: 14 },
   shopSub: { color: colors.inkMuted, fontSize: 13, marginTop: 4 },
+  ratingText: { color: colors.primaryDark, fontSize: 13, fontWeight: '800', marginTop: 6 },
+  ageCard: { backgroundColor: '#FEF3C7', borderRadius: radius.md, padding: spacing.md, marginTop: spacing.lg, borderWidth: 1, borderColor: '#FCD34D' },
+  ageText: { color: '#92400E', fontSize: 13, fontWeight: '700' },
 
   infoCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md, borderWidth: 1, borderColor: colors.border, gap: 8 },
   infoRow: { color: colors.inkMuted, fontSize: 13, fontWeight: '600' },

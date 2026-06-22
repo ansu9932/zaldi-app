@@ -17,6 +17,19 @@ dashboard; steps marked **[Kiro]** are code I wire up for you.
    This hashes all staff passwords, stops the app key from reading the staff
    table, and validates order totals server-side. Logins keep working — the apps
    automatically use the secure login function once this is run.
+9. **Before public launch (security v2):** New query → paste `supabase/secure_setup_v2.sql` → **Run**.
+   This is the big hardening step. It:
+   - Creates the `create_order` function — the ONLY way the app places an order
+     now. It re-prices every item from the `products` table, validates the
+     coupon, recomputes delivery/rain/surge fees and the total on the server,
+     decrements stock, writes item `product_id`s, and issues a 4-digit delivery OTP.
+     A tampered phone can no longer set its own prices/discount/total.
+   - Blocks the app key from inserting orders directly (forces it through the
+     function) and makes the money columns immutable after an order is created.
+   - Adds `products.stock`, `orders.delivery_otp`, the `shop_ratings` view, and
+     `expire_stale_orders()` (cancels abandoned unpaid UPI orders).
+   The app keeps working automatically; until you run this it falls back to the
+   old insert path (insecure), so run it before launch.
 ✅ Your tables, security rules, and realtime are now live.
 
 ## Step 2 — Connect the apps to Supabase  **[You, 1 min]**
@@ -75,3 +88,14 @@ Real Google Maps with the rider's live location needs a "development build"
 - Functions base URL: `https://wllitkewxmadrrmcdxvs.functions.supabase.co`
 - Never put `RAZORPAY_KEY_SECRET` or the `service_role` key in any app `.env`
   (only in Supabase secrets). The app `.env` uses only the **anon** + **public** keys.
+
+### Security checklist (do before public launch)
+- [ ] Run `secure_setup.sql` **and** `secure_setup_v2.sql` (Step 1.8 + 1.9).
+- [ ] Protect the Admin dashboard: set `VITE_ADMIN_PASSCODE` in `apps/admin/.env`
+      (without it the dashboard is open to anyone who has the URL).
+- [ ] Schedule `select expire_stale_orders();` to run every ~10 min
+      (Supabase → Database → Cron / pg_cron) so abandoned UPI orders auto-cancel.
+- [ ] Rotate the Razorpay key id that was committed in earlier docs, and keep
+      live keys out of git going forward.
+- [ ] (Optional) Set `EXPO_PUBLIC_SUPPORT_PHONE` / `_WHATSAPP` / `_EMAIL` in the
+      customer `.env` so the in-app Help & Support screen can reach you.

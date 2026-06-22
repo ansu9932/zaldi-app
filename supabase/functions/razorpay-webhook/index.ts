@@ -38,15 +38,35 @@ serve(async (req) => {
   const event = JSON.parse(body);
   if (event.event === 'payment.captured') {
     const payment = event.payload.payment.entity;
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, serviceKey);
     // Match by the razorpay order id we stored when creating the order.
-    await supabase
+    const { data: updated } = await supabase
       .from('orders')
       .update({ payment_status: 'paid', razorpay_payment_id: payment.id, status: 'placed' })
-      .eq('razorpay_order_id', payment.order_id);
+      .eq('razorpay_order_id', payment.order_id)
+      .select('id')
+      .maybeSingle();
+
+    // Now that the order is 'placed', notify the merchant ("New order"). Without
+    // this, paid UPI orders would only appear on the merchant's next poll with no
+    // push alert.
+    if (updated?.id) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/notify-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+          },
+          body: JSON.stringify({ order_id: updated.id }),
+        });
+      } catch (_e) {
+        /* best-effort: never fail the webhook because a push didn't send */
+      }
+    }
   }
 
   return new Response('ok', { status: 200 });
