@@ -71,10 +71,10 @@ export default function Track() {
   useEffect(() => {
     if (DEMO_MODE || !lastOrder?.id) {
       const timers: ReturnType<typeof setTimeout>[] = [];
-      timers.push(setTimeout(() => setStep(1), 2500));
-      timers.push(setTimeout(() => setStep(2), 5500));
-      timers.push(setTimeout(() => setStep(3), 8000));
-      timers.push(setTimeout(() => setStep(4), 20000));
+      timers.push(setTimeout(() => { setStep(1); setLastOrderStatus('accepted'); }, 2500));
+      timers.push(setTimeout(() => { setStep(2); setLastOrderStatus('ready'); }, 5500));
+      timers.push(setTimeout(() => { setStep(3); setLastOrderStatus('assigned'); }, 8000));
+      timers.push(setTimeout(() => { setStep(4); setLastOrderStatus('delivered'); }, 20000));
       return () => timers.forEach(clearTimeout);
     }
     let mounted = true;
