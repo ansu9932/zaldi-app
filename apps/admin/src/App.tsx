@@ -364,6 +364,7 @@ function StaffManager() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [vehicle, setVehicle] = useState('');
   const [shop, setShop] = useState('');
 
   useEffect(() => { if (shops.length && !shop) setShop(shops[0].id); }, [shops]);
@@ -374,8 +375,8 @@ function StaffManager() {
   async function onAdd() {
     if (!name || !username || !password) { setMsg('Name, username and password are required.'); return; }
     if (role === 'merchant' && !shop) { setMsg('Assign a shop to the merchant (add one in Shops first).'); return; }
-    const res = await addStaff({ role, name, username, password, phone: phone || null, shop_id: role === 'merchant' ? shop : null, active: true });
-    if (res.ok) { setMsg('Login created ✅'); setName(''); setUsername(''); setPassword(''); setPhone(''); load(); }
+    const res = await addStaff({ role, name, username, password, phone: phone || null, vehicle_no: role === 'rider' ? (vehicle || null) : null, shop_id: role === 'merchant' ? shop : null, active: true });
+    if (res.ok) { setMsg('Login created ✅'); setName(''); setUsername(''); setPassword(''); setPhone(''); setVehicle(''); load(); }
     else setMsg('Error: ' + res.error);
   }
 
@@ -401,6 +402,9 @@ function StaffManager() {
           <input className="inp" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input className="inp" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
           <input className="inp" placeholder="Phone (for customer to call rider)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          {role === 'rider' && (
+            <input className="inp" placeholder="Vehicle / plate no (e.g. WB-30 AB 1234)" value={vehicle} onChange={(e) => setVehicle(e.target.value)} />
+          )}
           {role === 'merchant' && (
             <select className="inp" value={shop} onChange={(e) => setShop(e.target.value)}>
               {shops.length === 0 && <option value="">— add a shop first —</option>}

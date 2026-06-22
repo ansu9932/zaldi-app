@@ -10,6 +10,7 @@ export interface Staff {
   username: string;
   password: string;
   phone?: string | null;
+  vehicle_no?: string | null;
   shop_id: string | null;
   active: boolean;
 }

@@ -63,7 +63,7 @@ grant execute on function verify_staff_login(text, text, text) to anon, authenti
 
 -- ---------- 3. Safe public view for Admin (no secrets) ----------
 create or replace view staff_public as
-  select id, role, name, username, shop_id, active, phone, is_online, created_at
+  select id, role, name, username, shop_id, active, phone, is_online, vehicle_no, created_at
   from staff;
 grant select on staff_public to anon, authenticated;
 

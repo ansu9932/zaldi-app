@@ -189,19 +189,19 @@ export async function cancelOrder(orderId: string): Promise<{ ok: boolean }> {
   return { ok: !error && !!data && data.length > 0 };
 }
 
-export interface RiderInfo { name: string; phone: string | null }
+export interface RiderInfo { name: string; phone: string | null; vehicle: string | null }
 
-/** Fetch the real assigned rider's name + phone for an order (null until assigned). */
+/** Fetch the real assigned rider's name + phone + vehicle for an order (null until assigned). */
 export async function getOrderRider(orderId: string): Promise<RiderInfo | null> {
   if (DEMO_MODE) return null;
   const { data: order } = await supabase.from('orders').select('rider_id').eq('id', orderId).single();
   if (!order?.rider_id) return null;
   // Prefer the safe public view (works after secure_setup.sql); fall back to staff.
-  const pub = await supabase.from('staff_public').select('name, phone').eq('id', order.rider_id).maybeSingle();
-  if (!pub.error && pub.data) return { name: pub.data.name, phone: pub.data.phone ?? null };
-  const { data: rider } = await supabase.from('staff').select('name, phone').eq('id', order.rider_id).maybeSingle();
+  const pub = await supabase.from('staff_public').select('name, phone, vehicle_no').eq('id', order.rider_id).maybeSingle();
+  if (!pub.error && pub.data) return { name: pub.data.name, phone: pub.data.phone ?? null, vehicle: pub.data.vehicle_no ?? null };
+  const { data: rider } = await supabase.from('staff').select('name, phone, vehicle_no').eq('id', order.rider_id).maybeSingle();
   if (!rider) return null;
-  return { name: rider.name, phone: rider.phone ?? null };
+  return { name: rider.name, phone: rider.phone ?? null, vehicle: rider.vehicle_no ?? null };
 }
 
 /** Save a customer rating (1-5) + optional comment for a delivered order. */
@@ -249,4 +249,15 @@ export async function getCatalogProducts(): Promise<Product[]> {
   } catch {
     return [];
   }
+}
+
+
+/** Live-refresh the catalog when Admin adds/edits/removes products (realtime). */
+export function subscribeCatalog(onChange: () => void): () => void {
+  if (DEMO_MODE) return () => {};
+  const channel = supabase
+    .channel('catalog-' + Math.random().toString(36).slice(2))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onChange)
+    .subscribe();
+  return () => supabase.removeChannel(channel);
 }

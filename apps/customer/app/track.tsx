@@ -9,6 +9,7 @@ import {
   Linking,
   ScrollView,
   Alert,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
@@ -43,6 +44,26 @@ function statusToStep(status: string): number {
 const DEMO_RIDER: RiderInfo & { vehicle: string; rating: string } = {
   name: 'Rahul (demo rider)', vehicle: 'WB-30 · Scooter', rating: '4.8', phone: null,
 };
+
+/** Small looping bike animation (Blinkit/Zepto style) shown while the order is in progress. */
+function BikeBar() {
+  const x = useRef(new Animated.Value(0)).current;
+  const LANE = width - spacing.xl * 2 - spacing.lg * 2;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(x, { toValue: 1, duration: 2600, easing: Easing.linear, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const tx = x.interpolate({ inputRange: [0, 1], outputRange: [-6, Math.max(40, LANE)] });
+  return (
+    <View style={styles.lane}>
+      <View style={styles.laneLine} />
+      <Animated.Text style={[styles.laneBike, { transform: [{ translateX: tx }] }]}>🛵</Animated.Text>
+    </View>
+  );
+}
 
 const { width } = Dimensions.get('window');
 const PANEL_W = width - spacing.lg * 2;
@@ -187,6 +208,7 @@ export default function Track() {
             <Text style={styles.etaLabel}>ARRIVING IN</Text>
             <Text style={styles.etaValue}>~{lastOrder?.eta ?? 25} min</Text>
             <Text style={styles.etaStatus}>{STEPS[step].icon} {STEPS[step].label}</Text>
+            <BikeBar />
           </View>
 
           {lastOrder ? (
@@ -205,9 +227,7 @@ export default function Track() {
               <Text style={styles.riderName}>{step >= 3 ? (rider?.name ?? 'Your rider') : 'Assigning a rider…'}</Text>
               <Text style={styles.riderMeta}>
                 {step >= 3
-                  ? riderDist != null
-                    ? `🛵 ${riderDist.toFixed(1)} km away`
-                    : 'On the way to pick up your order'
+                  ? `${rider?.vehicle ? '🛵 ' + rider.vehicle : '🛵 Scooter'}${riderDist != null ? ' · ' + riderDist.toFixed(1) + ' km away' : ''}`
                   : 'We will assign the nearest rider'}
               </Text>
             </View>
@@ -257,6 +277,9 @@ const styles = StyleSheet.create({
   etaLabel: { color: colors.inkFaint, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   etaValue: { color: colors.white, fontSize: 38, fontWeight: '900', marginVertical: 2 },
   etaStatus: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  lane: { width: '100%', height: 30, marginTop: 14, justifyContent: 'center' },
+  laneLine: { position: 'absolute', left: 0, right: 0, top: 20, height: 0, borderTopWidth: 2, borderColor: 'rgba(255,255,255,0.18)', borderStyle: 'dashed' },
+  laneBike: { fontSize: 24 },
   map: { width: PANEL_W, height: PANEL_H, backgroundColor: '#EAF2EC', borderRadius: radius.xl, overflow: 'hidden', marginBottom: spacing.lg },
   gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(15,23,42,0.05)' },
   gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(15,23,42,0.05)' },

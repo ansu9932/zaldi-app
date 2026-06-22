@@ -73,7 +73,16 @@ export default function Home() {
         if (!silent) setError('Location permission is needed to check delivery availability.');
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      // Get a fix fast: try live GPS with an 8s cap, then fall back to last known.
+      const live = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+      ]);
+      const pos = live ?? (await Location.getLastKnownPositionAsync());
+      if (!pos) {
+        if (!silent) setError('Could not get your location. Please try again, or tap "I\'m in Contai".');
+        return;
+      }
       const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       const result = isServiceable(point);
       setLocation(point, result.ok, result.distanceKm);
@@ -141,7 +150,7 @@ export default function Home() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.manualBtn}
-          onPress={() => setLocation(SERVICE_CENTER, true, 0)}
+          onPress={() => { setError(null); setPlaceName('Contai'); setLocation(SERVICE_CENTER, true, 0); }}
         >
           <Text style={styles.manualText}>I'm in Contai — continue manually</Text>
         </TouchableOpacity>

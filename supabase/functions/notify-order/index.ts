@@ -16,7 +16,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-interface PushMsg { to: string; title: string; body: string; sound: 'default'; data: Record<string, unknown> }
+interface PushMsg { to: string; title: string; body: string; sound: 'default'; priority: 'high'; channelId: string; data: Record<string, unknown> }
 
 function code(id: string): string {
   return '#' + String(id).replace(/-/g, '').slice(0, 6).toUpperCase();
@@ -46,7 +46,7 @@ serve(async (req) => {
     const messages: PushMsg[] = [];
     const pushTo = (token: string | null | undefined, title: string, body: string) => {
       if (token && String(token).startsWith('ExponentPushToken')) {
-        messages.push({ to: token, title, body, sound: 'default', data: { orderId: order.id } });
+        messages.push({ to: token, title, body, sound: 'default', priority: 'high', channelId: 'default', data: { orderId: order.id } });
       }
     };
 

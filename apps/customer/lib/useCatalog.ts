@@ -1,18 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Product } from './catalog';
-import { getCatalogProducts } from './api';
+import { getCatalogProducts, subscribeCatalog } from './api';
 
-/** Returns the live product catalog from the database (empty until products are added in Admin). */
+/**
+ * Returns the product catalog.
+ * - DEMO: the bundled sample catalog.
+ * - LIVE: products from the database, and it auto-refreshes in real time
+ *   whenever you add/edit/remove a product in the Admin dashboard.
+ */
 export function useCatalog(): { products: Product[]; loading: boolean } {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    getCatalogProducts()
-      .then((p) => { if (mounted) setProducts(p); })
-      .finally(() => mounted && setLoading(false));
-    return () => { mounted = false; };
+    const load = () =>
+      getCatalogProducts()
+        .then((p) => { if (mounted) setProducts(p); })
+        .finally(() => { if (mounted) setLoading(false); });
+    load();
+    const unsub = subscribeCatalog(load); // live updates from Admin
+    return () => { mounted = false; unsub(); };
   }, []);
 
   return { products, loading };

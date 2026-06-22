@@ -9,9 +9,10 @@ alter table orders add column if not exists discount    numeric(10,2) not null d
 alter table orders add column if not exists tip_amount   numeric(10,2) not null default 0;
 alter table orders add column if not exists coupon_code  text;
 
--- ---- Staff: phone (so customers can call the rider) + online status ----
-alter table staff add column if not exists phone     text;
-alter table staff add column if not exists is_online boolean default false;
+-- ---- Staff: phone (so customers can call the rider) + online status + vehicle ----
+alter table staff add column if not exists phone      text;
+alter table staff add column if not exists is_online  boolean default false;
+alter table staff add column if not exists vehicle_no text;
 
 -- ---- Coupons ----
 create table if not exists coupons (
@@ -50,3 +51,9 @@ drop policy if exists "ratings anon all" on ratings;
 create policy "ratings anon all" on ratings for all to anon, authenticated using (true) with check (true);
 
 notify pgrst, 'reload schema';
+
+-- Make product changes stream live to the customer app.
+do $$ begin
+  alter publication supabase_realtime add table products;
+exception when duplicate_object then null; end $$;
+
