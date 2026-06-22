@@ -131,7 +131,35 @@ export async function deliverOrder(id: string, paidOnline: boolean, otp?: string
   return { ok: true };
 }
 
-/** Save this rider's Expo push token so they get "new job" alerts. */
+/** Ask our server to create a Razorpay UPI QR for this order's exact amount.
+ *  The customer scans it; Razorpay confirms payment via webhook (auto-marks paid). */
+export async function createRazorpayQr(orderId: string): Promise<{ imageUrl?: string; amount?: number; error?: string }> {
+  if (DEMO_MODE) return { error: 'demo mode' };
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  try {
+    const res = await fetch(`${base}/functions/v1/create-razorpay-qr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anon}`, apikey: anon },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+    const text = await res.text();
+    let d: any = {};
+    try { d = JSON.parse(text); } catch {}
+    if (!res.ok || !d?.image_url) return { error: d?.error ?? `(${res.status}) ${text.slice(0, 180)}` };
+    return { imageUrl: d.image_url, amount: d.amount };
+  } catch (e: any) {
+    return { error: String(e?.message ?? e) };
+  }
+}
+
+/** Current payment status of an order ('pending' | 'cod' | 'paid'). Used to poll
+ *  while the Razorpay QR is on screen. */
+export async function getPaymentStatus(orderId: string): Promise<string> {
+  if (DEMO_MODE) return 'pending';
+  const { data } = await supabase.from('orders').select('payment_status').eq('id', orderId).maybeSingle();
+  return data?.payment_status ?? 'pending';
+}
 export async function savePushToken(riderId: string | undefined, token: string): Promise<void> {
   if (DEMO_MODE || !riderId) return;
   try { await supabase.from('staff').update({ push_token: token }).eq('id', riderId); } catch { /* column may not exist yet */ }

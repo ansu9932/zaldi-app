@@ -36,36 +36,53 @@ serve(async (req) => {
   if (!ok) return new Response('Invalid signature', { status: 401 });
 
   const event = JSON.parse(body);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  let paidOrderId: string | null = null;
+  let paymentId: string | null = null;
+
   if (event.event === 'payment.captured') {
+    // Customer pre-paid UPI flow (checkout screen): matched by razorpay_order_id.
     const payment = event.payload.payment.entity;
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, serviceKey);
-    // Match by the razorpay order id we stored when creating the order.
+    paymentId = payment.id;
     const { data: updated } = await supabase
       .from('orders')
       .update({ payment_status: 'paid', razorpay_payment_id: payment.id, status: 'placed' })
       .eq('razorpay_order_id', payment.order_id)
       .select('id')
       .maybeSingle();
+    paidOrderId = updated?.id ?? null;
+  } else if (event.event === 'qr_code.credited') {
+    // Rider "collect via Razorpay QR" flow: matched by the QR id / order_id note.
+    const qr = event.payload.qr_code?.entity;
+    const payment = event.payload.payment?.entity;
+    paymentId = payment?.id ?? null;
+    const orderId = qr?.notes?.order_id ?? null;
+    const query = supabase
+      .from('orders')
+      .update({ payment_status: 'paid', payment_method: 'upi', razorpay_payment_id: payment?.id ?? null });
+    const { data: updated } = orderId
+      ? await query.eq('id', orderId).select('id').maybeSingle()
+      : await query.eq('razorpay_qr_id', qr?.id).select('id').maybeSingle();
+    paidOrderId = updated?.id ?? null;
+  }
 
-    // Now that the order is 'placed', notify the merchant ("New order"). Without
-    // this, paid UPI orders would only appear on the merchant's next poll with no
-    // push alert.
-    if (updated?.id) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/notify-order`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${serviceKey}`,
-            apikey: serviceKey,
-          },
-          body: JSON.stringify({ order_id: updated.id }),
-        });
-      } catch (_e) {
-        /* best-effort: never fail the webhook because a push didn't send */
-      }
+  // Notify the relevant parties once an order has been paid.
+  if (paidOrderId) {
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/notify-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({ order_id: paidOrderId }),
+      });
+    } catch (_e) {
+      /* best-effort: never fail the webhook because a push didn't send */
     }
   }
 
