@@ -3,12 +3,14 @@
     "name": "next Merchant",
     "slug": "next-merchant",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "nextmerchant",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "runtimeVersion": { "policy": "appVersion" },
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
@@ -18,7 +20,11 @@
       "bundleIdentifier": "in.nextapp.merchant"
     },
     "android": {
-      "package": "in.nextapp.merchant"
+      "package": "in.nextapp.merchant",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      }
     },
     "web": { "bundler": "metro", "output": "single" },
     "plugins": ["expo-router", "expo-updates", ["expo-notifications", { "color": "#00D16B" }]],

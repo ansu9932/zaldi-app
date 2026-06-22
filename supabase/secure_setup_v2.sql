@@ -33,6 +33,7 @@ alter table products add column if not exists stock int;                 -- null
 alter table orders   add column if not exists delivery_otp  text;
 alter table orders   add column if not exists cancel_reason text;
 alter table orders   add column if not exists delivered_at  timestamptz;
+alter table orders   add column if not exists razorpay_qr_id text;
 alter table ratings  add column if not exists shop_id  uuid references shops(id) on delete set null;
 alter table ratings  add column if not exists rider_id uuid;
 

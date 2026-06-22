@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image, Alert, TextInput } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch, Linking, RefreshControl, Modal, Image, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder, fetchTodayStats, setRiderOnline, savePushToken } from '../lib/api';
+import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder, fetchTodayStats, setRiderOnline, savePushToken, createRazorpayQr, getPaymentStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
 import { registerForPush } from '../lib/push';
-
-const UPI_VPA = process.env.EXPO_PUBLIC_UPI_VPA ?? '';
 
 export default function RiderHome() {
   const session = useAuth((s) => s.session);
@@ -27,6 +25,10 @@ function Dashboard() {
   const [deliveries, setDeliveries] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrErr, setQrErr] = useState<string | null>(null);
+  const [qrPaid, setQrPaid] = useState(false);
   const [otpModal, setOtpModal] = useState<{ open: boolean; paidOnline: boolean }>({ open: false, paidOnline: false });
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -112,9 +114,28 @@ function Dashboard() {
     load();
   }
 
-  const upiUrl = current
-    ? `upi://pay?pa=${encodeURIComponent(UPI_VPA)}&pn=${encodeURIComponent('next')}&am=${current.total}&cu=INR&tn=${encodeURIComponent('Order ' + current.code)}`
-    : '';
+  async function openCollectQr() {
+    if (!current) return;
+    setShowQR(true);
+    setQrUrl(null);
+    setQrErr(null);
+    setQrPaid(false);
+    setQrLoading(true);
+    const res = await createRazorpayQr(current.id);
+    setQrLoading(false);
+    if (res.imageUrl) setQrUrl(res.imageUrl);
+    else setQrErr(res.error ?? 'Could not create the payment QR.');
+  }
+
+  // While the Razorpay QR is on screen, poll until the webhook marks the order paid.
+  useEffect(() => {
+    if (!showQR || !current || qrPaid) return;
+    const t = setInterval(async () => {
+      const st = await getPaymentStatus(current.id);
+      if (st === 'paid') setQrPaid(true);
+    }, 4000);
+    return () => clearInterval(t);
+  }, [showQR, current?.id, qrPaid]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgSoft }}>
@@ -159,8 +180,8 @@ function Dashboard() {
                     <Text style={styles.collectLabel}>Collect</Text>
                     <Text style={styles.collectAmount}>₹{current.total}</Text>
                   </View>
-                  <TouchableOpacity style={styles.upiBtn} onPress={() => setShowQR(true)}>
-                    <Text style={styles.upiBtnText}>📲 Collect via UPI (show QR)</Text>
+                  <TouchableOpacity style={styles.upiBtn} onPress={openCollectQr}>
+                    <Text style={styles.upiBtnText}>📲 Collect via UPI (Razorpay QR)</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.cashBtn} onPress={() => finishDelivery(current, false)}>
                     <Text style={styles.cashBtnText}>💵 Cash received · Mark delivered</Text>
@@ -203,26 +224,36 @@ function Dashboard() {
         )}
       </ScrollView>
 
-      {/* UPI QR collection modal */}
+      {/* Razorpay UPI QR collection modal */}
       <Modal visible={showQR} transparent animationType="slide" onRequestClose={() => setShowQR(false)}>
         <View style={styles.modalBg}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Scan to pay ₹{current?.total}</Text>
-            <Text style={styles.modalSub}>Ask the customer to scan with any UPI app</Text>
+            <Text style={styles.modalTitle}>Collect ₹{current?.total}</Text>
+            <Text style={styles.modalSub}>Razorpay UPI QR · customer scans to pay the exact amount</Text>
             <View style={styles.qrBox}>
-              {UPI_VPA ? (
-                <Image
-                  source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(upiUrl) }}
-                  style={{ width: 220, height: 220 }}
-                />
-              ) : (
-                <Text style={styles.qrWarn}>Set EXPO_PUBLIC_UPI_VPA in the rider .env to your UPI ID to enable QR.</Text>
-              )}
+              {qrLoading ? (
+                <ActivityIndicator size="large" color={colors.primary} />
+              ) : qrErr ? (
+                <Text style={styles.qrWarn}>{qrErr}</Text>
+              ) : qrUrl ? (
+                <Image source={{ uri: qrUrl }} style={{ width: 220, height: 220 }} />
+              ) : null}
             </View>
-            {!!UPI_VPA && <Text style={styles.vpaText}>{UPI_VPA}</Text>}
-            {current && (
-              <TouchableOpacity style={styles.paidBtn} onPress={() => finishDelivery(current, true)}>
-                <Text style={styles.paidBtnText}>✅ Payment received · Mark delivered</Text>
+            {qrPaid ? (
+              <>
+                <Text style={styles.paidNote}>✅ Payment received via Razorpay</Text>
+                {current && (
+                  <TouchableOpacity style={styles.paidBtn} onPress={() => { setShowQR(false); finishDelivery(current, true); }}>
+                    <Text style={styles.paidBtnText}>Continue to delivery · enter OTP</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              !qrLoading && !qrErr && <Text style={styles.waitingNote}>Waiting for payment… this confirms automatically.</Text>
+            )}
+            {!qrPaid && current && (
+              <TouchableOpacity onPress={() => { setShowQR(false); finishDelivery(current, true); }}>
+                <Text style={styles.manualLink}>Customer paid but not detected? Continue manually →</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQR(false)}>
@@ -329,6 +360,9 @@ const styles = StyleSheet.create({
   qrBox: { padding: spacing.lg, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, minHeight: 220, alignItems: 'center', justifyContent: 'center' },
   qrWarn: { color: colors.error, textAlign: 'center', fontSize: 13, paddingHorizontal: 20 },
   vpaText: { color: colors.inkMuted, fontWeight: '700', marginTop: spacing.md },
+  paidNote: { color: colors.success, fontWeight: '900', fontSize: 16, marginTop: spacing.lg },
+  waitingNote: { color: colors.inkMuted, fontSize: 13, fontWeight: '600', marginTop: spacing.lg, textAlign: 'center' },
+  manualLink: { color: colors.inkFaint, fontSize: 12, fontWeight: '700', marginTop: spacing.md, textAlign: 'center', textDecorationLine: 'underline' },
   paidBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: spacing.lg, width: '100%' },
   paidBtnText: { color: colors.white, fontWeight: '900', fontSize: 15 },
   closeBtn: { paddingVertical: 14, marginTop: 4 },
