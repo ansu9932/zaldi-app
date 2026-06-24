@@ -20,13 +20,15 @@ import { ProductImage } from '../lib/ProductImage';
 import { useCatalog } from '../lib/useCatalog';
 import { useGuardedAdd } from '../lib/useGuardedAdd';
 import { ActiveOrderBar } from '../lib/ActiveOrderBar';
+import { FREE_DELIVERY_SUBTOTAL } from '../lib/commission';
 
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { serviceable, distanceFromCenter, setLocation, count, name, selectedAddress } = useStore();
+  const { serviceable, distanceFromCenter, setLocation, count, name, selectedAddress, subtotal } = useStore();
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const cartCount = count();
+  const cartSubtotal = subtotal();
   const addr = selectedAddress();
   const lastOrder = useStore((s) => s.lastOrder);
   const lastOrderStatus = useStore((s) => s.lastOrderStatus);
@@ -210,9 +212,12 @@ export default function Home() {
         <View style={[styles.bottomStack, { paddingBottom: insets.bottom, backgroundColor: lastOrderStatus === 'cancelled' ? colors.error : showActive ? colors.ink : colors.primary }]}>
           {cartCount > 0 && (
             <TouchableOpacity style={styles.cartBar} onPress={() => router.push('/cart')}>
-              <Text style={styles.cartBarText}>
-                {cartCount} item{cartCount > 1 ? 's' : ''} in cart
-              </Text>
+              <View>
+                <Text style={styles.cartBarText}>
+                  {cartCount} item{cartCount > 1 ? 's' : ''} · ₹{cartSubtotal}
+                </Text>
+                <Text style={styles.cartBarHint}>{cartSubtotal >= FREE_DELIVERY_SUBTOTAL ? '🎉 Free delivery unlocked' : `Add ₹${FREE_DELIVERY_SUBTOTAL - cartSubtotal} more for free delivery`}</Text>
+              </View>
               <Text style={styles.cartBarCta}>View Cart →</Text>
             </TouchableOpacity>
           )}
@@ -340,7 +345,7 @@ const styles = StyleSheet.create({
 
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg - 4, marginTop: spacing.sm },
   catItem: { width: '25%', alignItems: 'center', paddingVertical: spacing.sm },
-  catIcon: { width: 58, height: 58, borderRadius: radius.lg, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  catIcon: { width: 58, height: 58, borderRadius: radius.lg, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   catLabel: { fontSize: 11, fontWeight: '700', color: colors.inkMuted, marginTop: 6, textAlign: 'center' },
 
   highlightRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
@@ -352,7 +357,7 @@ const styles = StyleSheet.create({
   highlightSub: { color: colors.primary, fontWeight: '700', fontSize: 11, marginTop: 2 },
   noProducts: { textAlign: 'center', color: colors.inkMuted, marginTop: spacing.xl, fontSize: 14, paddingHorizontal: spacing.xl },
 
-  pCard: { width: 150, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  pCard: { width: 150, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   pTag: { position: 'absolute', top: 8, left: 8, zIndex: 2, backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
   pTagText: { color: colors.primaryDark, fontSize: 9, fontWeight: '900' },
   favBtn: { position: 'absolute', top: 6, right: 6, zIndex: 2, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
@@ -376,5 +381,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl, paddingVertical: 16,
   },
   cartBarText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  cartBarHint: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 11, marginTop: 2 },
   cartBarCta: { color: colors.white, fontWeight: '900', fontSize: 15 },
 });

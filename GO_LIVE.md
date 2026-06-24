@@ -38,6 +38,11 @@ dashboard; steps marked **[Kiro]** are code I wire up for you.
     offered to the closest online rider first, then cascades outward). It also
     adds `staff.lat/lng/last_delivered_at` for rider routing. See `BUSINESS_MODEL.md`
     for the rates and a worked example.
+11. **(Optional) Auto rider cascade:** New query → paste
+    `supabase/cron_rider_cascade.sql` → **Run**. Uses pg_cron so unaccepted rider
+    offers move to the next-nearest rider automatically on the server (every ~30s),
+    even when no rider has the app open. Skip this if you prefer the app-driven
+    cascade only.
 ✅ Your tables, security rules, and realtime are now live.
 
 ## Step 2 — Connect the apps to Supabase  **[You, 1 min]**
