@@ -7,9 +7,10 @@
  * Also enforces an 18+ age check before adding alcohol / tobacco (wine,
  * cigarettes) — legally required, and what Blinkit/Zepto do for these items.
  */
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { useStore } from './store';
 import { Product, shopById, isAgeRestricted } from './catalog';
+import { LEGAL } from './legal';
 
 export function useGuardedAdd() {
   const lines = useStore((s) => s.lines);
@@ -48,14 +49,17 @@ export function useGuardedAdd() {
   }
 
   return (product: Product) => {
-    // 18+ gate for alcohol / tobacco.
+    // 18+ gate for alcohol / tobacco. Asked only ONCE per account — once the user
+    // confirms they're 18+ and accepts the Terms, `ageVerified` is saved to their
+    // account/device and we never ask again.
     if (isAgeRestricted(product.category) && !ageVerified) {
       Alert.alert(
-        'Are you 18 or older?',
-        'Alcohol and tobacco can only be sold to adults aged 18+. By continuing you confirm you are 18 or older and will show a valid ID at delivery.',
+        'Confirm age & accept Terms',
+        'Alcohol and tobacco can only be sold to adults aged 18+. By tapping “I’m 18+ & Accept” you confirm you are 18 or older, agree to our Terms & Conditions and Privacy Policy, and will show a valid ID at delivery.',
         [
-          { text: 'No', style: 'cancel' },
-          { text: "Yes, I'm 18+", onPress: () => { confirmAge(); doAdd(product); } },
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Read Terms', onPress: () => Linking.openURL(LEGAL.terms) },
+          { text: 'I’m 18+ & Accept', onPress: () => { confirmAge(); doAdd(product); } },
         ],
       );
       return;

@@ -7,21 +7,25 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
 import { useStore } from '../lib/store';
+import { LEGAL } from '../lib/legal';
 
 export default function Login() {
   const insets = useSafeAreaInsets();
   const login = useStore((s) => s.login);
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const valid = /^[6-9]\d{9}$/.test(phone);
+  const canContinue = valid && accepted;
 
   function onContinue() {
-    if (!valid) return;
+    if (!canContinue) return;
     // DEMO login. Live = Supabase phone OTP (Stage: Go Live).
     login(phone, name.trim() || undefined);
     router.replace('/home');
@@ -66,10 +70,27 @@ export default function Login() {
           onChangeText={setName}
         />
 
+        {/* One-time Terms & Privacy acceptance at sign-up */}
         <TouchableOpacity
-          style={[styles.btn, !valid && styles.btnDisabled]}
+          style={styles.acceptRow}
+          activeOpacity={0.8}
+          onPress={() => setAccepted((v) => !v)}
+        >
+          <View style={[styles.checkbox, accepted && styles.checkboxOn]}>
+            {accepted && <Text style={styles.checkboxTick}>✓</Text>}
+          </View>
+          <Text style={styles.acceptText}>
+            I agree to next's{' '}
+            <Text style={styles.link} onPress={() => Linking.openURL(LEGAL.terms)}>Terms &amp; Conditions</Text>
+            {' '}and{' '}
+            <Text style={styles.link} onPress={() => Linking.openURL(LEGAL.privacy)}>Privacy Policy</Text>.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.btn, !canContinue && styles.btnDisabled]}
           onPress={onContinue}
-          disabled={!valid}
+          disabled={!canContinue}
         >
           <Text style={styles.btnText}>Continue</Text>
         </TouchableOpacity>
@@ -79,9 +100,7 @@ export default function Login() {
           we connect the live backend.
         </Text>
 
-        <Text style={styles.terms}>
-          By continuing you agree to next's Terms & Privacy Policy.
-        </Text>
+        <Text style={styles.terms}>Operated by {LEGAL.company}.</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -145,6 +164,12 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { backgroundColor: colors.border },
   btnText: { color: colors.white, fontWeight: '900', fontSize: 16 },
+  acceptRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 18 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxTick: { color: colors.white, fontWeight: '900', fontSize: 14 },
+  acceptText: { flex: 1, color: colors.inkMuted, fontSize: 12.5, lineHeight: 18 },
+  link: { color: colors.primaryDark, fontWeight: '800', textDecorationLine: 'underline' },
   note: { color: colors.inkFaint, fontSize: 12, marginTop: 16, lineHeight: 17 },
   terms: { color: colors.inkFaint, fontSize: 11, marginTop: 'auto', textAlign: 'center' },
 });

@@ -1,0 +1,9 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Android adaptive icon FOREGROUND (transparent bg). Keep art inside the
+       centre ~66% "safe zone"; set the background colour to #0F172A in app.json. -->
+  <text x="512" y="560" text-anchor="middle"
+        font-family="Inter, Arial, Helvetica, sans-serif"
+        font-size="240" font-weight="800" fill="#FFFFFF"
+        letter-spacing="-10">next</text>
+  <circle cx="720" cy="560" r="38" fill="#00D16B"/>
+</svg>

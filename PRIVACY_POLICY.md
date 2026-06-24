@@ -2,16 +2,16 @@
 
 **Last updated:** 24 June 2026
 
-> ⚠️ Before publishing, replace every **[PLACEHOLDER]** with your real details and
-> host this page at a public URL (e.g. `https://nextapp.in/privacy`). Both the
-> Google Play Console and Apple App Store Connect require a working Privacy Policy
-> URL. A free way to host it: paste this into a GitHub Pages site, a Notion public
-> page, or your website.
+> ⚠️ **Not legal advice.** This is a template prepared to get you started. Before
+> publishing, have it reviewed by a lawyer, replace every **[PLACEHOLDER]** with your
+> real company details, and host it at a public URL (e.g.
+> `https://moolyaindiapvtltd.com/next/privacy`). Both Google Play and the Apple App
+> Store require a working Privacy Policy URL.
 
-This Privacy Policy explains how **[LEGAL ENTITY NAME]** ("we", "us", "next", the
-"Platform") collects, uses, and protects your information when you use the **next**
-customer app, the **next Partner** (merchant) app, and the **next Rider** app
-(together, the "Apps").
+This Privacy Policy explains how **Moolya India Private Limited** ("we", "us",
+"Company", the "Platform"), operator of the **next** brand and apps, collects, uses,
+and protects your information when you use the **next** customer app, the **next
+Partner** (merchant) app, and the **next Rider** app (together, the "Apps").
 
 By using the Apps, you agree to this Policy.
 
@@ -19,9 +19,13 @@ By using the Apps, you agree to this Policy.
 
 ## 1. Who we are
 
-- **Service operator:** [LEGAL ENTITY NAME]
-- **Contact email:** [SUPPORT EMAIL, e.g. support@nextapp.in]
-- **Address:** [BUSINESS ADDRESS]
+- **Company:** Moolya India Private Limited
+- **Brand / product:** next
+- **Website:** https://moolyaindiapvtltd.com/
+- **CIN:** [COMPANY CIN — fill from your incorporation certificate]
+- **GSTIN:** [GSTIN — if registered]
+- **Grievance / contact email:** [support@moolyaindiapvtltd.com — confirm]
+- **Registered office:** [REGISTERED OFFICE ADDRESS — fill]
 - **Service area:** Contai (Kanthi) and nearby areas, West Bengal, India.
 
 ---
@@ -103,9 +107,9 @@ your information.
 ## 7. Your rights & data deletion
 
 You may request to **access, correct, or delete** your personal data. To request
-account/data deletion, email **[SUPPORT EMAIL]** from your registered phone/email
-or use the in-app **Help & Support** screen. We will action verified requests within
-30 days, subject to legal retention requirements.
+account/data deletion, email **[support@moolyaindiapvtltd.com — confirm]** from your
+registered phone/email or use the in-app **Help & Support** screen. We will action
+verified requests within 30 days, subject to legal retention requirements.
 
 ---
 
@@ -129,6 +133,21 @@ updated" date. Continued use after changes means you accept the updated Policy.
 
 ---
 
-## 10. Contact
+## 10. Grievance Officer (India — IT Rules, 2021)
 
-Questions about privacy? Email **[SUPPORT EMAIL]** or write to **[BUSINESS ADDRESS]**.
+In accordance with the Information Technology Act, 2000 and the rules made
+thereunder, the contact details of our Grievance Officer are:
+
+- **Name:** [GRIEVANCE OFFICER NAME]
+- **Company:** Moolya India Private Limited
+- **Email:** [grievance@moolyaindiapvtltd.com — confirm]
+- **Address:** [REGISTERED OFFICE ADDRESS]
+
+We aim to acknowledge complaints within 48 hours and resolve them within 30 days.
+
+---
+
+## 11. Contact
+
+Questions about privacy? Email **[support@moolyaindiapvtltd.com — confirm]** or write
+to Moolya India Private Limited, **[REGISTERED OFFICE ADDRESS]**.
