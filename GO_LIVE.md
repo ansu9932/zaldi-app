@@ -30,6 +30,14 @@ dashboard; steps marked **[Kiro]** are code I wire up for you.
      `expire_stale_orders()` (cancels abandoned unpaid UPI orders).
    The app keeps working automatically; until you run this it falls back to the
    old insert path (insecure), so run it before launch.
+10. **Commission + smart routing:** New query → paste
+    `supabase/commission_and_assignment.sql` → **Run**. This adds the fair
+    "everyone wins" money split to every order (merchant payout, rider payout,
+    platform commission/fee/net), free delivery above the basket threshold,
+    nearest-store routing, and the nearest-rider waterfall (a new `ready` order is
+    offered to the closest online rider first, then cascades outward). It also
+    adds `staff.lat/lng/last_delivered_at` for rider routing. See `BUSINESS_MODEL.md`
+    for the rates and a worked example.
 ✅ Your tables, security rules, and realtime are now live.
 
 ## Step 2 — Connect the apps to Supabase  **[You, 1 min]**

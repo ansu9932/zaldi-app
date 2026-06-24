@@ -10,6 +10,10 @@ export interface LiveOrder {
   status: string;
   payment: string;
   ago: string;
+  // Money split ("everyone wins") — see BUSINESS_MODEL.md
+  merchantPayout: number;
+  riderPayout: number;
+  platformNet: number;
 }
 
 function ago(ts: string): string {
@@ -24,7 +28,7 @@ export async function listLiveOrders(): Promise<LiveOrder[]> {
   if (DEMO_MODE) return [];
   const { data, error } = await supabase
     .from('orders')
-    .select('id, customer_name, dropoff_address, total, status, payment_method, created_at')
+    .select('id, customer_name, dropoff_address, total, status, payment_method, created_at, merchant_payout, rider_payout, platform_net')
     .order('created_at', { ascending: false })
     .limit(100);
   if (error || !data) return [];
@@ -38,5 +42,22 @@ export async function listLiveOrders(): Promise<LiveOrder[]> {
     status: r.status,
     payment: r.payment_method ?? 'cod',
     ago: ago(r.created_at),
+    merchantPayout: Number(r.merchant_payout ?? 0),
+    riderPayout: Number(r.rider_payout ?? 0),
+    platformNet: Number(r.platform_net ?? 0),
   }));
+}
+
+/** Platform profit summary across recent orders (for an admin dashboard tile). */
+export async function platformProfitSummary(): Promise<{ orders: number; revenue: number; profit: number }> {
+  if (DEMO_MODE) return { orders: 0, revenue: 0, profit: 0 };
+  const { data, error } = await supabase
+    .from('orders')
+    .select('platform_revenue, platform_net, status')
+    .neq('status', 'cancelled')
+    .limit(1000);
+  if (error || !data) return { orders: 0, revenue: 0, profit: 0 };
+  const revenue = data.reduce((s: number, r: any) => s + Number(r.platform_revenue ?? 0), 0);
+  const profit = data.reduce((s: number, r: any) => s + Number(r.platform_net ?? 0), 0);
+  return { orders: data.length, revenue: Math.round(revenue), profit: Math.round(profit) };
 }

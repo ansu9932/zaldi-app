@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../lib/brand';
 import { DEMO_MODE } from '../lib/supabase';
-import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, deliverOrder, fetchTodayStats, setRiderOnline, savePushToken, createRazorpayQr, getPaymentStatus } from '../lib/api';
+import { Job, fetchJobs, acceptJob, advanceJob, subscribeOrders, updateRiderLocation, updateRiderPresence, deliverOrder, fetchTodayStats, setRiderOnline, savePushToken, createRazorpayQr, getPaymentStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { LoginScreen } from '../lib/LoginScreen';
 import { registerForPush } from '../lib/push';
@@ -33,8 +33,33 @@ function Dashboard() {
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [riderLoc, setRiderLoc] = useState<{ lat: number; lng: number } | null>(null);
 
-  const load = useCallback(async () => setJobs(await fetchJobs(session?.id)), [session?.id]);
+  const load = useCallback(async () => setJobs(await fetchJobs(session?.id, riderLoc)), [session?.id, riderLoc]);
+
+  // Track the rider's own position (even when idle) so the nearest-rider router
+  // can offer new orders to whoever is closest to the pickup store.
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    let cancelled = false;
+    async function start() {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted' || cancelled) return;
+      const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (cancelled) return;
+      setRiderLoc({ lat: first.coords.latitude, lng: first.coords.longitude });
+      if (online) updateRiderPresence(session?.id, first.coords.latitude, first.coords.longitude);
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 30000, distanceInterval: 80 },
+        (pos) => {
+          setRiderLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          if (online) updateRiderPresence(session?.id, pos.coords.latitude, pos.coords.longitude);
+        },
+      );
+    }
+    start();
+    return () => { cancelled = true; if (sub) sub.remove(); };
+  }, [session?.id, online]);
 
   useEffect(() => {
     load();
@@ -199,7 +224,12 @@ function Dashboard() {
             <Text style={styles.section}>📦 New job offers</Text>
             {offers.length === 0 && <Text style={styles.empty}>No jobs right now. When a merchant marks an order ready, it appears here.</Text>}
             {offers.map((j) => (
-              <View key={j.id} style={styles.card}>
+              <View key={j.id} style={[styles.card, j.preferredForMe && styles.cardPreferred]}>
+                {j.preferredForMe && (
+                  <View style={styles.preferredBanner}>
+                    <Text style={styles.preferredText}>🎯 Nearest to you · reserved first</Text>
+                  </View>
+                )}
                 <View style={styles.cardTop}>
                   <Text style={styles.code}>{j.code}</Text>
                   <View style={styles.payoutPill}>
@@ -326,6 +356,9 @@ const styles = StyleSheet.create({
   section: { fontSize: 16, fontWeight: '800', color: colors.ink, marginBottom: spacing.md },
   empty: { color: colors.inkMuted, fontStyle: 'italic' },
   card: { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  cardPreferred: { borderColor: colors.primary, borderWidth: 2 },
+  preferredBanner: { backgroundColor: colors.primaryLight, borderRadius: radius.sm, paddingVertical: 6, paddingHorizontal: 10, marginBottom: spacing.sm, alignSelf: 'flex-start' },
+  preferredText: { color: colors.primaryDark, fontWeight: '900', fontSize: 12 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   code: { fontWeight: '900', color: colors.ink, fontSize: 16 },
   payout: { fontWeight: '900', color: colors.success, fontSize: 18 },

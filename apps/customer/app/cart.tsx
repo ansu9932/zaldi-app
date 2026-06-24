@@ -9,6 +9,7 @@ import { createOrder } from '../lib/api';
 import { DEMO_MODE } from '../lib/supabase';
 import { fetchIsRaining } from '../lib/weather';
 import { applyCoupon, discountFor, Coupon } from '../lib/coupons';
+import { computeCommission } from '../lib/commission';
 
 const TIP_OPTIONS = [0, 10, 20, 30];
 
@@ -59,7 +60,26 @@ export default function Cart() {
     }
   }, [discount, coupon]);
 
-  const finalTotal = Math.max(0, fees.total - discount + tip);
+  // MRP savings across the cart (for the transparent "you save" line).
+  const mrpSavings = items.reduce(
+    (s, l) => s + Math.max(0, (l.product.mrp ?? l.product.price) - l.product.price) * l.qty,
+    0,
+  );
+
+  // The "everyone wins" money split. Customer-facing fields drive the bill:
+  // free delivery above the basket threshold + a small transparent platform fee.
+  const breakdown = computeCommission({
+    itemSubtotal: fees.subtotal,
+    deliveryFee: fees.deliveryFee,
+    rainFee: fees.rainFee,
+    surgeFee: fees.surgeFee,
+    discount,
+    tip,
+    distanceKm: shopToCustomerKm,
+    mrpSavings,
+  });
+
+  const finalTotal = breakdown.customerTotal;
   const eta = estimatedDeliveryMin(shopToCustomerKm);
 
   // Checkout-time delivery-area validation against the actual delivery address.
@@ -268,13 +288,23 @@ export default function Cart() {
         <View style={styles.card}>
           <Text style={styles.billTitle}>Bill details</Text>
           <BillRow label="Item total" value={`₹${fees.subtotal}`} />
-          <BillRow label={`Delivery fee (${shopToCustomerKm.toFixed(1)} km)`} value={`₹${fees.deliveryFee}`} />
+          {breakdown.deliveryFee > 0 ? (
+            <BillRow label={`Delivery fee (${shopToCustomerKm.toFixed(1)} km)`} value={`₹${breakdown.deliveryFee}`} />
+          ) : (
+            <BillRow label={`Delivery fee (${shopToCustomerKm.toFixed(1)} km)`} value="FREE" green />
+          )}
+          <BillRow label="Platform fee" value={`₹${breakdown.platformFee}`} />
           {fees.rainFee > 0 && <BillRow label="🌧️ Rain fee" value={`₹${fees.rainFee}`} />}
           {fees.surgeFee > 0 && <BillRow label="Surge fee" value={`₹${fees.surgeFee}`} />}
           {discount > 0 && <BillRow label={`Coupon (${coupon?.code})`} value={`−₹${discount}`} green />}
-          {tip > 0 && <BillRow label="Rider tip" value={`₹${tip}`} />}
+          {tip > 0 && <BillRow label="Rider tip (100% to rider)" value={`₹${tip}`} />}
           <View style={styles.divider} />
           <BillRow label="To pay" value={`₹${finalTotal}`} bold />
+          {breakdown.customerSavings > 0 && (
+            <View style={styles.savingsPill}>
+              <Text style={styles.savingsText}>🎉 You save ₹{breakdown.customerSavings} on this order</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -362,7 +392,8 @@ const styles = StyleSheet.create({
   billValue: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   billBold: { fontWeight: '900', color: colors.ink, fontSize: 16 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
-
+  savingsPill: { backgroundColor: '#ECFDF5', borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 12, marginTop: 10 },
+  savingsText: { color: colors.success, fontWeight: '800', fontSize: 13, textAlign: 'center' },
   checkout: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.lg, gap: spacing.sm },
   needAddr: { color: colors.error, fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 2 },
   payBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center' },
