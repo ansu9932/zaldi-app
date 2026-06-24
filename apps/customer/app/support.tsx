@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { Stack } from 'expo-router';
 import { colors, radius, spacing } from '../lib/brand';
+import { LEGAL } from '../lib/legal';
 
 const SUPPORT_PHONE = process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '';
-const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@next.app';
+const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@moolyaindiapvtltd.com';
 const SUPPORT_WHATSAPP = process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP ?? SUPPORT_PHONE;
 
 const FAQS: { q: string; a: string }[] = [
@@ -60,7 +61,17 @@ export default function Support() {
           </TouchableOpacity>
         ))}
 
-        <Text style={styles.footer}>next · Contai · We usually reply within a few minutes during delivery hours.</Text>
+        <Text style={styles.section}>Legal</Text>
+        <TouchableOpacity style={styles.legalRow} activeOpacity={0.8} onPress={() => Linking.openURL(LEGAL.terms)}>
+          <Text style={styles.legalText}>📄  Terms & Conditions</Text>
+          <Text style={styles.legalChev}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.legalRow} activeOpacity={0.8} onPress={() => Linking.openURL(LEGAL.privacy)}>
+          <Text style={styles.legalText}>🔒  Privacy Policy</Text>
+          <Text style={styles.legalChev}>›</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.footer}>next · operated by {LEGAL.company} · Contai · We usually reply within a few minutes during delivery hours.</Text>
       </ScrollView>
     </View>
   );
@@ -79,5 +90,8 @@ const styles = StyleSheet.create({
   faqQ: { fontWeight: '700', color: colors.ink, fontSize: 14, flex: 1, paddingRight: 8 },
   faqChev: { fontSize: 22, fontWeight: '800', color: colors.primary },
   faqA: { color: colors.inkMuted, fontSize: 13, lineHeight: 20, marginTop: 10 },
+  legalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  legalText: { fontWeight: '700', color: colors.ink, fontSize: 14 },
+  legalChev: { fontSize: 22, fontWeight: '800', color: colors.inkFaint },
   footer: { textAlign: 'center', color: colors.inkFaint, fontSize: 12, marginTop: spacing.xl },
 });
