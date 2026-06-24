@@ -27,7 +27,7 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
-      "android": { "buildType": "apk" },
+      "android": { "buildType": "app-bundle" },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wllitkewxmadrrmcdxvs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsbGl0a2V3eG1hZHJybWNkeHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMjkzMTgsImV4cCI6MjA5NzYwNTMxOH0.U9SlksE26WdwpbAzDJS1-QlTmtWdklk5xirxGiT_9Bg",
