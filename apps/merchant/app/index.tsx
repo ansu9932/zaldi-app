@@ -11,10 +11,12 @@ import { registerForPush } from '../lib/push';
 const STATUS_LABEL: Record<string, string> = {
   placed: 'NEW', accepted: 'PREPARING', ready: 'READY · finding rider',
   assigned: 'RIDER ASSIGNED', picked_up: 'PICKED UP', delivered: 'DELIVERED',
+  cancelled: 'CANCELLED',
 };
 const STATUS_COLOR: Record<string, string> = {
   placed: colors.warning, accepted: colors.primary, ready: colors.success,
   assigned: colors.accent, picked_up: colors.accent, delivered: colors.inkFaint,
+  cancelled: colors.error,
 };
 
 export default function MerchantHome() {

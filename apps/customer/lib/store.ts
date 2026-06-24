@@ -101,6 +101,7 @@ interface AppState {
   orderHistory: PastOrder[];
   addToHistory: (o: PastOrder) => void;
   markRated: (id: string) => void;
+  updateOrderStatuses: (statuses: Record<string, string>) => void;
 
   // Deferred checkout: for online (UPI) orders we DON'T clear the cart or write
   // history until payment actually succeeds. This avoids "ghost orders" where a
@@ -191,6 +192,12 @@ export const useStore = create<AppState>()(
       orderHistory: [],
       addToHistory: (o) => set((s) => ({ orderHistory: [o, ...s.orderHistory] })),
       markRated: (id) => set((s) => ({ orderHistory: s.orderHistory.map((o) => (o.id === id ? { ...o, rated: true } : o)) })),
+      updateOrderStatuses: (statuses) =>
+        set((s) => ({
+          orderHistory: s.orderHistory.map((o) =>
+            statuses[o.id] && statuses[o.id] !== o.status ? { ...o, status: statuses[o.id] } : o,
+          ),
+        })),
 
       pendingCheckout: null,
       setPendingCheckout: (p) => set({ pendingCheckout: p }),

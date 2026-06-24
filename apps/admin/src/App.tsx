@@ -23,7 +23,9 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
 
 const CONTAI = { lat: 21.7781, lng: 87.7517 };
 
-const ADMIN_PASSCODE = (import.meta.env.VITE_ADMIN_PASSCODE as string) ?? '';
+// Admin passcode: set VITE_ADMIN_PASSCODE in apps/admin/.env to override.
+// Defaults to "1234" so the dashboard is protected out of the box.
+const ADMIN_PASSCODE = (import.meta.env.VITE_ADMIN_PASSCODE as string) || '1234';
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {

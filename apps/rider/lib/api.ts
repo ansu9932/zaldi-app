@@ -64,6 +64,34 @@ export const DEMO_JOBS: Job[] = [
   { id: 'demoj1', code: '#NX1041', customer: 'Ananya P. (demo)', dropAddress: 'Darua, Contai', dropLat: 21.77, dropLng: 87.745, distanceKm: 1.6, total: 174, items: 4, payout: 28, status: 'ready', paymentMethod: 'cod', paymentStatus: 'cod', shopName: 'Kanthi Fresh Mart', shopLat: 21.779, shopLng: 87.752, shopAddress: 'Central Market, Contai', preferredForMe: true },
 ];
 
+const JOB_SELECT = '*, order_items(id), shops(name,lat,lng,address)';
+
+/** Fetch the open offers for a rider. Tries the smart nearest-rider waterfall
+ *  (needs commission_and_assignment.sql); if those columns aren't installed yet
+ *  it transparently falls back to "all ready, unassigned orders" so riders ALWAYS
+ *  see new orders. */
+async function fetchOffers(riderId?: string): Promise<any[]> {
+  if (riderId) {
+    const nowIso = new Date().toISOString();
+    const res = await supabase
+      .from('orders')
+      .select(JOB_SELECT)
+      .eq('status', 'ready')
+      .is('rider_id', null)
+      .or(`preferred_rider_id.eq.${riderId},preferred_rider_id.is.null,offer_expires_at.lt.${nowIso}`)
+      .order('created_at', { ascending: true });
+    if (!res.error && res.data) return res.data;
+    // Falls through to the basic query if the smart-routing columns don't exist.
+  }
+  const basic = await supabase
+    .from('orders')
+    .select(JOB_SELECT)
+    .eq('status', 'ready')
+    .is('rider_id', null)
+    .order('created_at', { ascending: true });
+  return basic.data ?? [];
+}
+
 export async function fetchJobs(riderId?: string, riderLoc?: { lat: number; lng: number } | null): Promise<Job[]> {
   if (DEMO_MODE) return DEMO_JOBS;
 
@@ -71,33 +99,22 @@ export async function fetchJobs(riderId?: string, riderLoc?: { lat: number; lng:
   // (best-effort; ignored if the function isn't installed yet).
   try { await supabase.rpc('reassign_expired_offers'); } catch { /* ignore */ }
 
-  // Offers = ready, unassigned orders that are EITHER reserved for me (I'm the
-  // nearest rider) OR whose reservation window has opened up to everyone.
-  let offersQ = supabase
-    .from('orders')
-    .select('*, order_items(id), shops(name,lat,lng,address)')
-    .eq('status', 'ready')
-    .is('rider_id', null)
-    .order('created_at', { ascending: true });
-  const nowIso = new Date().toISOString();
-  if (riderId) {
-    offersQ = offersQ.or(
-      `preferred_rider_id.eq.${riderId},preferred_rider_id.is.null,offer_expires_at.lt.${nowIso}`,
-    );
-  }
   // Mine = orders this rider has accepted and is still delivering
   const mineQ = riderId
     ? supabase
         .from('orders')
-        .select('*, order_items(id), shops(name,lat,lng,address)')
+        .select(JOB_SELECT)
         .eq('rider_id', riderId)
         .in('status', ['assigned', 'picked_up'])
         .order('created_at', { ascending: true })
     : null;
 
-  const [offers, mine] = await Promise.all([offersQ, mineQ ?? Promise.resolve({ data: [] } as any)]);
+  const [offerRows, mine] = await Promise.all([
+    fetchOffers(riderId),
+    mineQ ?? Promise.resolve({ data: [] } as any),
+  ]);
   const mineJobs = (mine?.data ?? []).map((r: any) => mapRow(r, riderId));
-  let offerJobs = (offers.data ?? []).map((r: any) => mapRow(r, riderId));
+  let offerJobs = (offerRows ?? []).map((r: any) => mapRow(r, riderId));
 
   // Rank offers: orders reserved for me first, then by nearest pickup store to
   // my current location (so a fast rider near a new order sees it at the top).
