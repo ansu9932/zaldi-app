@@ -57,7 +57,7 @@ export default function Search() {
         <View style={styles.bottom}>
           <Text style={styles.price}>₹{item.price}</Text>
           {qty === 0 ? (
-            <TouchableOpacity style={styles.addBtn} onPress={() => guardedAdd(item)}>
+            <TouchableOpacity style={styles.addBtn} activeOpacity={0.85} onPress={() => guardedAdd(item)}>
               <Text style={styles.addBtnText}>ADD</Text>
             </TouchableOpacity>
           ) : (
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: colors.white, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.border },
   chipText: { color: colors.inkMuted, fontWeight: '700', fontSize: 13 },
   empty: { textAlign: 'center', color: colors.inkMuted, marginTop: 40 },
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   name: { fontWeight: '700', color: colors.ink, fontSize: 13, minHeight: 34 },
   unit: { color: colors.inkFaint, fontSize: 11, marginTop: 2, marginBottom: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
