@@ -113,7 +113,7 @@ export default function ProductDetail() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         {qty === 0 ? (
-          <TouchableOpacity style={styles.addBtn} onPress={() => guardedAdd(product)}>
+          <TouchableOpacity style={styles.addBtn} activeOpacity={0.85} onPress={() => guardedAdd(product)}>
             <Text style={styles.addBtnText}>Add to cart · ₹{product.price}</Text>
           </TouchableOpacity>
         ) : (
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   savePill: { backgroundColor: colors.primaryLight, borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
   saveText: { color: colors.primaryDark, fontWeight: '900', fontSize: 12 },
 
-  shopCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  shopCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   shopTitle: { fontWeight: '800', color: colors.ink, fontSize: 14 },
   shopSub: { color: colors.inkMuted, fontSize: 13, marginTop: 4 },
   ratingText: { color: colors.primaryDark, fontSize: 13, fontWeight: '800', marginTop: 6 },
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   infoRow: { color: colors.inkMuted, fontSize: 13, fontWeight: '600' },
 
   relTitle: { fontWeight: '800', color: colors.ink, fontSize: 16, marginTop: spacing.xl, marginBottom: spacing.md },
-  relCard: { width: 110, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  relCard: { width: 110, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   relName: { fontWeight: '700', color: colors.ink, fontSize: 12, marginTop: 6 },
   relPrice: { fontWeight: '900', color: colors.ink, fontSize: 13, marginTop: 2 },
 

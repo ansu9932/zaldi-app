@@ -9,7 +9,7 @@ import { createOrder } from '../lib/api';
 import { DEMO_MODE } from '../lib/supabase';
 import { fetchIsRaining } from '../lib/weather';
 import { applyCoupon, discountFor, Coupon } from '../lib/coupons';
-import { computeCommission } from '../lib/commission';
+import { computeCommission, FREE_DELIVERY_SUBTOTAL } from '../lib/commission';
 
 const TIP_OPTIONS = [0, 10, 20, 30];
 
@@ -199,6 +199,16 @@ export default function Cart() {
           <Text style={styles.etaText}>Arriving in ~{eta} min</Text>
         </View>
 
+        {breakdown.deliveryFee > 0 ? (
+          <View style={styles.freeHint}>
+            <Text style={styles.freeHintText}>Add ₹{FREE_DELIVERY_SUBTOTAL - fees.subtotal} more to unlock FREE delivery 🚀</Text>
+          </View>
+        ) : (
+          <View style={[styles.freeHint, styles.freeHintDone]}>
+            <Text style={[styles.freeHintText, { color: colors.success }]}>🎉 You unlocked FREE delivery!</Text>
+          </View>
+        )}
+
         {/* Delivery address */}
         <TouchableOpacity style={styles.addrCard} onPress={() => router.push('/address')}>
           {address ? (
@@ -318,6 +328,7 @@ export default function Cart() {
         )}
         <TouchableOpacity
           disabled={!canOrder}
+          activeOpacity={0.85}
           style={[styles.payBtn, !canOrder && styles.payBtnDisabled]}
           onPress={() => placeOrder('upi')}
         >
@@ -325,6 +336,7 @@ export default function Cart() {
         </TouchableOpacity>
         <TouchableOpacity
           disabled={!canOrder}
+          activeOpacity={0.85}
           style={[styles.codBtn, !canOrder && styles.codBtnDisabled]}
           onPress={() => placeOrder('cod')}
         >
@@ -353,8 +365,11 @@ const styles = StyleSheet.create({
   etaBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primaryLight, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg },
   etaEmoji: { fontSize: 18 },
   etaText: { color: colors.primaryDark, fontWeight: '800', fontSize: 15 },
+  freeHint: { backgroundColor: '#FFF7ED', borderRadius: radius.md, paddingVertical: 9, paddingHorizontal: 12, marginBottom: spacing.lg, borderWidth: 1, borderColor: '#FED7AA' },
+  freeHintDone: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  freeHintText: { color: '#C2410C', fontWeight: '800', fontSize: 13, textAlign: 'center' },
 
-  addrCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  addrCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   addrHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   addrLabel: { fontWeight: '800', color: colors.ink, fontSize: 14 },
   addrAddText: { fontWeight: '800', color: colors.primaryDark, fontSize: 14 },
@@ -362,7 +377,7 @@ const styles = StyleSheet.create({
   addrName: { color: colors.inkMuted, fontSize: 13, marginTop: 6 },
   addrLine: { color: colors.inkMuted, fontSize: 13, marginTop: 2 },
 
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 8 },
   itemName: { fontWeight: '700', color: colors.ink, fontSize: 14 },
   itemUnit: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
