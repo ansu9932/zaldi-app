@@ -54,6 +54,24 @@ alter table staff  add column if not exists lng               double precision;
 alter table staff  add column if not exists last_delivered_at timestamptz;
 alter table staff  add column if not exists is_online         boolean default true;
 
+-- ---------- 1b. Make the order-total integrity check platform-fee aware ----------
+-- secure_setup.sql installs enforce_order_total() WITHOUT platform_fee. Since we
+-- now add a platform fee to the total, redefine it here so valid orders aren't
+-- rejected. (No-op if secure_setup.sql was never run.)
+create or replace function enforce_order_total() returns trigger as $$
+declare expected numeric(10,2);
+begin
+  expected := coalesce(new.subtotal,0) + coalesce(new.delivery_fee,0)
+            + coalesce(new.platform_fee,0) + coalesce(new.rain_fee,0)
+            + coalesce(new.surge_fee,0) + coalesce(new.tip_amount,0)
+            - coalesce(new.discount,0);
+  if round(new.total, 2) <> round(expected, 2) then
+    raise exception 'Order total % does not match expected %', new.total, expected;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
 -- ---------- 2. The order creator (commission-aware, nearest-shop aware) ----------
 -- Same public signature as secure_setup_v2.sql so the apps keep working, but now
 -- it also: applies free delivery, computes the full money split, and (when

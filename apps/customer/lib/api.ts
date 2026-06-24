@@ -138,6 +138,20 @@ export async function getOrder(id: string): Promise<OrderStatusRow | null> {
   return data as OrderStatusRow;
 }
 
+/** Fetch the live status for many orders at once (for the order-history screen,
+ *  so cancelled/delivered/on-the-way is always accurate, not frozen at "placed"). */
+export async function getOrdersStatus(ids: string[]): Promise<Record<string, string>> {
+  if (DEMO_MODE || ids.length === 0) return {};
+  // Only real DB ids are UUIDs; skip local demo ids like "NX123456".
+  const real = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (real.length === 0) return {};
+  const { data, error } = await supabase.from('orders').select('id, status').in('id', real);
+  if (error || !data) return {};
+  const map: Record<string, string> = {};
+  for (const r of data as any[]) map[r.id] = r.status;
+  return map;
+}
+
 /** Subscribe to live status changes for one order. */
 export function subscribeOrder(id: string, cb: (row: OrderStatusRow) => void): () => void {
   if (DEMO_MODE) return () => {};
